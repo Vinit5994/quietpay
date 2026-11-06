@@ -19,7 +19,7 @@ export default function OverviewPage() {
   const o = overview.data;
   const setup = [
     { done: true, label: "Create your business", body: "Done. Payments go to your payout wallet.", href: null },
-    { done: Boolean(merchant?.webhookUrl), label: "Connect your server", body: "Add your webhook URL and keys so your app hears about payments.", href: "/dashboard/developers" },
+    { done: Boolean(merchant?.webhookUrl), label: "Connect your server", body: "Follow the Integrate guide: about 20 lines of code.", href: "/dashboard/integrate" },
     { done: Boolean(plans.data?.data.length), label: "Create a subscription plan", body: "For memberships, boxes or SaaS seats.", href: "/dashboard/plans" },
     { done: Boolean(links.data?.data.length), label: "Make a payment link", body: "Share it or print the QR code. No code needed.", href: "/dashboard/links" },
     { done: Boolean(o && o.paymentsCount > 0), label: "Take your first payment", body: "Pay one of your links with test USDT to see the whole flow.", href: "/dashboard/links" },

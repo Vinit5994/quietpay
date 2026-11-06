@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { explorerTx } from "@quietpay/shared";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 /* Small UI kit for the QuietPay web app. Tokens live in app/globals.css. */
 
@@ -231,5 +232,26 @@ export function Skeleton({ rows = 3 }: { rows?: number }) {
         <div key={i} className="h-4 animate-pulse rounded bg-[var(--color-ink)]/10" style={{ width: `${85 - i * 12}%` }} />
       ))}
     </div>
+  );
+}
+
+/** Previous / next controls for cursor-paginated lists. Hidden when everything fits on one page. */
+export function Pager({ page, hasNext, onPrev, onNext, loading }: { page: number; hasNext: boolean; onPrev: () => void; onNext: () => void; loading?: boolean }) {
+  if (page === 1 && !hasNext) return null;
+  return (
+    <nav className="flex items-center justify-between gap-3 border-t border-[var(--color-line)] px-5 py-3 text-sm" aria-label="Pagination">
+      <span className="text-[var(--color-muted)]" aria-live="polite">
+        Page {page}
+        {loading ? "…" : ""}
+      </span>
+      <div className="flex gap-2">
+        <Button variant="secondary" size="sm" onClick={onPrev} disabled={page === 1 || loading}>
+          <ChevronLeft className="h-4 w-4" aria-hidden /> Previous
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onNext} disabled={!hasNext || loading}>
+          Next <ChevronRight className="h-4 w-4" aria-hidden />
+        </Button>
+      </div>
+    </nav>
   );
 }

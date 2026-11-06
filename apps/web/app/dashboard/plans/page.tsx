@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Field, Modal, Notice, PageHeader, Panel, Skeleton, StatusChip, Table, inputCls } from "@/components/ui/kit";
+import { Button, Field, Modal, Notice, PageHeader, Panel, Skeleton, StatusChip, Table, inputCls, Pager } from "@/components/ui/kit";
 import { ApiError, api } from "@/lib/api";
 import { intervalLabel, timeAgo, usdt } from "@/lib/format";
 import { useMerchantToken } from "@/lib/merchant-auth";
-import { useApi } from "@/lib/use-api";
+import { PAGE_SIZE, useApi, usePager } from "@/lib/use-api";
 
 export default function PlansPage() {
   const token = useMerchantToken();
-  const plans = useApi((signal) => api("listPlans", { token, signal, query: { limit: 100 } }), [token]);
+  const pager = usePager();
+  const plans = useApi((signal) => api("listPlans", { token, signal, query: { limit: PAGE_SIZE, cursor: pager.cursor } }), [token, pager.cursor]);
   const [creating, setCreating] = useState(false);
 
   return (
@@ -42,6 +43,7 @@ export default function PlansPage() {
             ))}
           </Table>
         )}
+        <Pager page={pager.page} hasNext={Boolean(plans.data?.nextCursor)} loading={plans.loading} onPrev={pager.prev} onNext={() => plans.data?.nextCursor && pager.next(plans.data.nextCursor)} />
       </Panel>
       {creating ? (
         <NewPlan
