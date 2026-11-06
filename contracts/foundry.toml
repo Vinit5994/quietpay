@@ -22,3 +22,11 @@ whitechain_sepolia = { key = "verifyContract", chain = 1874, url = "https://expl
 
 [fmt]
 line_length = 120
+
+[lint]
+# Deliberate, reviewed in A3:
+# - block-timestamp: subscriptions, invoice expiry and grace periods are time-based by design (second-level skew is harmless).
+# - reentrancy-events: the only external calls are to the trusted USDT token, every entry point is nonReentrant, and
+#   charge() must emit after its low-level transferFrom because the event depends on the result.
+# - missing-zero-check: feeRecipient may be zero while feeBps == 0 (setFee enforces a recipient when bps > 0).
+exclude_lints = ["block-timestamp", "reentrancy-events", "missing-zero-check"]
