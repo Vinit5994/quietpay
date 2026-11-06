@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+/* Placeholder design tokens. The visual design is the developer's call (see docs/WORK_SPLIT.md "UI"). */
+@theme {
+  --color-bg: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-ink: #14181f;
+  --color-muted: #5b6472;
+  --color-line: #e2e6ec;
+  --color-accent: #2f5bea;
+  --color-accent-ink: #ffffff;
+  --color-good: #0f8a5f;
+  --color-warn: #b26a00;
+  --color-bad: #c23934;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0e1116;
+    --color-surface: #161b22;
+    --color-ink: #e8ecf1;
+    --color-muted: #9aa4b2;
+    --color-line: #262d38;
+    --color-accent: #6d8cff;
+    --color-accent-ink: #0e1116;
+  }
+}
+
+html, body { background: var(--color-bg); color: var(--color-ink); }
+.tabular { font-variant-numeric: tabular-nums; }
