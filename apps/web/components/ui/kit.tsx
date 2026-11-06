@@ -64,10 +64,17 @@ export function StatusChip({ status, label }: { status: string; label?: string }
   );
 }
 
-export function Stat({ label, value, hint, tone }: { label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: "warn" }) {
+export function Stat({ label, value, hint, tone, icon: Icon }: { label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: "warn"; icon?: React.ComponentType<{ className?: string }> }) {
   return (
     <div className="min-w-0 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)]">
-      <p className="text-[13px] font-medium text-[var(--color-muted)]">{label}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[13px] font-medium text-[var(--color-muted)]">{label}</p>
+        {Icon ? (
+          <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${tone === "warn" ? "bg-[var(--color-warn-soft)] text-[var(--color-warn)]" : "bg-[var(--color-brand-soft)] text-[var(--color-pine)]"}`} aria-hidden>
+            <Icon className="h-3.5 w-3.5" />
+          </span>
+        ) : null}
+      </div>
       <p className={`tabular mt-1 break-words font-semibold leading-tight tracking-tight ${tone === "warn" ? "text-[var(--color-warn)]" : ""} ${valueSize(value)}`}>{value}</p>
       {hint ? <p className="mt-1 text-xs text-[var(--color-muted)]">{hint}</p> : null}
     </div>
@@ -180,7 +187,7 @@ export function buttonCls(variant: "primary" | "secondary" | "danger" | "ghost" 
     "inline-flex items-center justify-center gap-2 rounded-lg text-center font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-link)] disabled:cursor-not-allowed disabled:opacity-60";
   const sizes = { sm: "h-8 px-3 text-sm", md: "h-10 px-4 text-sm", lg: "h-12 px-5 text-base" };
   const variants = {
-    primary: "bg-[var(--color-accent)] text-[var(--color-accent-ink)] shadow-[var(--shadow-card)] hover:bg-[#2a2a2e]",
+    primary: "bg-[var(--color-accent)] text-[var(--color-accent-ink)] shadow-[var(--shadow-card)] hover:bg-[var(--color-accent-hover)]",
     secondary: "border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-ink)] shadow-[var(--shadow-card)] hover:bg-[var(--color-bg)]",
     danger: "border border-[var(--color-line)] bg-[var(--color-surface)] text-[var(--color-bad)] shadow-[var(--shadow-card)] hover:bg-[var(--color-bad-soft)]",
     ghost: "text-[var(--color-muted)] underline-offset-4 hover:text-[var(--color-ink)] hover:underline",
