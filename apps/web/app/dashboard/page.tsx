@@ -33,7 +33,7 @@ export default function OverviewPage() {
         <Panel
           title="Recent payments"
           action={
-            <Link href="/dashboard/payments" className="text-sm font-bold text-[var(--color-link)] underline decoration-2 underline-offset-2 hover:decoration-[var(--color-accent)]">
+            <Link href="/dashboard/payments" className="text-sm font-semibold text-[var(--color-link)] underline decoration-1 underline-offset-2 hover:decoration-[var(--color-link)]">
               View all
             </Link>
           }
@@ -66,7 +66,7 @@ export default function OverviewPage() {
               You&apos;ve spent <span className="tabular font-semibold">{o ? `${Number(o.gas.spent).toFixed(4)} WBT` : "…"}</span> on{" "}
               <span className="tabular font-semibold">{o?.gas.txCount ?? "…"}</span> transactions.
             </p>
-            <p className="rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] bg-[var(--color-good-soft)] px-3 py-2 font-bold">Your customers have paid 0 WBT in gas.</p>
+            <p className="rounded-[var(--radius-base)] border border-[var(--color-line)] bg-[var(--color-good-soft)] px-3 py-2 font-semibold">Your customers have paid 0 WBT in gas.</p>
             {o ? (
               <div>
                 <div className="flex justify-between text-xs text-[var(--color-muted)]">
@@ -75,9 +75,9 @@ export default function OverviewPage() {
                     {Number(o.gas.spent).toFixed(4)} / {Number(o.gas.budget).toFixed(4)} WBT
                   </span>
                 </div>
-                <div className="mt-1.5 h-4 overflow-hidden rounded-full border-2 border-[var(--color-ink)] bg-[var(--color-surface)]">
+                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[var(--color-neutral-soft)]">
                   <div
-                    className="h-full border-r-2 border-[var(--color-ink)] bg-[var(--color-accent)]"
+                    className="h-full rounded-full bg-[var(--color-brand)]"
                     style={{ width: `${Math.min(100, (Number(o.gas.spentWei) / Math.max(1, Number(o.gas.budgetWei))) * 100)}%` }}
                   />
                 </div>

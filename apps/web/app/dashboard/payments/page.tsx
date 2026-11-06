@@ -134,7 +134,7 @@ function RefundModal({ payment, token, onClose, onDone }: { payment: Payment; to
   return (
     <Modal title="Refund payment" onClose={onClose}>
       <form onSubmit={submit} className="space-y-4">
-        <div className="rounded-[var(--radius-base)] border-2 border-dashed border-[var(--color-ink)]/40 bg-[var(--color-bg)] p-3 text-sm">
+        <div className="rounded-[var(--radius-base)] border border-[var(--color-line)] bg-[var(--color-bg)] p-3 text-sm">
           <p className="font-mono text-xs text-[var(--color-muted)]">{payment.reference}</p>
           <p className="mt-1">
             Paid <span className="tabular font-medium">{usdt(payment.amount)}</span>
