@@ -103,7 +103,8 @@ function Summary({ session }: { session: PublicSession }) {
         <span className="inline-block rounded-full border-2 border-[var(--color-ink)] bg-[var(--color-info-soft)] px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider">Subscription</span>
         <p className="mt-2 text-xl font-bold">{plan.name}</p>
         <p className="tabular mt-3 font-[family-name:var(--font-display)] text-4xl font-bold">
-          {formatUsdt(plan.amount)} <span className="font-sans text-base font-medium text-[var(--color-muted)]">{every}</span>
+          {formatUsdt(plan.amount)}
+          <span className="mt-1 block font-sans text-base font-medium text-[var(--color-muted)]">{every}</span>
         </p>
         <ul className="mt-4 space-y-1.5 text-sm">
           <li>First charge today, then {every}.</li>
