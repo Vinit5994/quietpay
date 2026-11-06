@@ -36,6 +36,9 @@ importers:
 
   apps/store:
     dependencies:
+      '@quietpay/node':
+        specifier: workspace:*
+        version: link:../../packages/sdk-node
       next:
         specifier: ^15.3.0
         version: 15.5.29(@types/node@22.20.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -45,6 +48,9 @@ importers:
       react-dom:
         specifier: ^19.1.0
         version: 19.3.1(react@19.3.1)
+      server-only:
+        specifier: ^0.0.1
+        version: 0.0.1
     devDependencies:
       '@tailwindcss/postcss':
         specifier: 4.3.4
@@ -1260,6 +1266,9 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
+  server-only@0.0.1:
+    resolution: {integrity: sha512-qepMx2JxAa5jjfzxG79yPPq+8BuFToHd1hm7kI+Z4zAq1ftQiP7HcxMhDDItrbtwVeLg/cY2JnKnrcFkmiswNA==}
+
   set-blocking@2.0.0:
     resolution: {integrity: sha512-KiKBS8AnWGEyLzofFfmvKwpdPzqiy16LvQfK3yv/fVH7Bj13/wl3JSR1J+rfgRE9q7xUJK4qvgS8raSOeLUehw==}
 
@@ -2288,6 +2297,8 @@ snapshots:
 
   semver@7.8.6:
     optional: true
+
+  server-only@0.0.1: {}
 
   set-blocking@2.0.0: {}
 

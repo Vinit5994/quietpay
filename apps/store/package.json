@@ -2,7 +2,7 @@
   "name": "@swag-counter/store",
   "version": "0.1.0",
   "private": true,
-  "description": "Swag Counter: a demo merchant that integrates QuietPay only through @quietpay/node (added in B6).",
+  "description": "Swag Counter: a demo merchant that integrates QuietPay only through @quietpay/node.",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
@@ -13,7 +13,9 @@
   "dependencies": {
     "next": "^15.3.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "@quietpay/node": "workspace:*",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.4",

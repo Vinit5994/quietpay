@@ -1,18 +1,25 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createOrder, type CartItemInput } from "@/lib/orders";
+import { createOrder, setOrder, type CartItemInput } from "@/lib/orders";
+import { qp, STORE_URL } from "@/lib/quietpay";
 
-/**
- * Creates the order in the store's own database. B6 adds the QuietPay part here:
- * `qp.checkout.sessions.create(...)` and a redirect to the hosted checkout.
- */
-export async function checkout(items: CartItemInput[]): Promise<{ error: string } | never> {
-  let orderId: string;
+export async function checkout(items: CartItemInput[]): Promise<{ error: string }> {
+  let url: string;
   try {
-    orderId = createOrder(items).id;
+    const order = createOrder(items);
+    const session = await qp.checkout.sessions.create({
+      mode: "payment",
+      reference: order.id,
+      lineItems: order.lines.map((l) => ({ name: l.name, unitAmount: l.unitPrice, quantity: l.qty })),
+      successUrl: `${STORE_URL}/orders/${order.id}`,
+      cancelUrl: `${STORE_URL}/cart`,
+    });
+    setOrder(order.id, { sessionId: session.id, checkoutUrl: session.url });
+    url = session.url;
   } catch (err) {
-    return { error: (err as Error).message };
+    console.error("[checkout]", err);
+    return { error: "We couldn't start the payment. Please try again in a moment." };
   }
-  redirect(`/orders/${orderId}`);
+  redirect(url);
 }
