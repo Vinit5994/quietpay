@@ -32,9 +32,10 @@ function Gate({ children }: { children: React.ReactNode }) {
   if (session.state === "ready") return <Frame>{children}</Frame>;
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4 py-10">
-      <p className="text-sm font-semibold text-[var(--color-accent)]">QuietPay</p>
-      <h1 className="mt-1 text-2xl font-semibold">Merchant dashboard</h1>
-      <div className="mt-6 rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-5 shadow-sm">
+      <div><p className="inline-flex items-center gap-1.5 rounded-full border-2 border-[var(--color-ink)] bg-[var(--color-accent)] px-2.5 py-0.5 text-xs font-black uppercase tracking-wider">QuietPay</p></div>
+      <h1 className="mt-3 text-4xl font-bold">Merchant dashboard</h1>
+      <p className="mt-2 text-[var(--color-muted)]">Get paid in USDT. No gas, no seed phrases.</p>
+      <div className="mt-6 rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] bg-[var(--color-surface)] p-5 shadow-[var(--shadow-brutal-lg)]">
         {session.state === "loading" || session.state === "signing_in" ? (
           <p className="text-sm text-[var(--color-muted)]">{session.state === "signing_in" ? "Waiting for your signature…" : "Loading…"}</p>
         ) : session.state === "no_wallet" ? (
@@ -104,7 +105,7 @@ function SignIn({ error }: { error?: string }) {
         </Button>
       </div>
       {isMock ? (
-        <div className="mt-5 border-t border-[var(--color-line)] pt-4">
+        <div className="mt-5 border-t-2 border-dashed border-[var(--color-ink)]/30 pt-4">
           <p className="text-xs text-[var(--color-muted)]">Mock API only: open the seeded Swag Counter business (with sample data) using this wallet.</p>
           <Button size="sm" variant="secondary" className="mt-2" disabled={claiming} onClick={() => void claimDemo()}>
             Use demo merchant
@@ -126,7 +127,7 @@ function Onboarding({ token }: { token: string }) {
   if (created) {
     return (
       <>
-        <h2 className="text-lg font-semibold">{created.merchant.name} is ready</h2>
+        <h2 className="text-xl font-bold">{created.merchant.name} is ready</h2>
         <Notice tone="warn">Copy these now. The secret key and webhook secret are only shown once.</Notice>
         <div className="mt-4 space-y-3">
           <CopyField label="Secret key (server only)" value={created.secretKey} secret />
@@ -157,7 +158,7 @@ function Onboarding({ token }: { token: string }) {
   return (
     <form onSubmit={submit} className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold">Set up your business</h2>
+        <h2 className="text-xl font-bold">Set up your business</h2>
         <p className="mt-1 text-sm text-[var(--color-muted)]">Payments go straight to your wallet. QuietPay never holds your money.</p>
       </div>
       <Field label="Business name">
@@ -181,15 +182,20 @@ function Frame({ children }: { children: React.ReactNode }) {
   if (session.state !== "ready") return null;
   return (
     <div className="min-h-dvh md:flex">
-      <aside className="border-b border-[var(--color-line)] bg-[var(--color-surface)] md:sticky md:top-0 md:flex md:h-dvh md:w-60 md:flex-col md:border-b-0 md:border-r">
+      <aside className="border-b-2 border-[var(--color-ink)] bg-[var(--color-surface)] md:sticky md:top-0 md:flex md:h-dvh md:w-64 md:flex-col md:border-b-0 md:border-r-2">
         <div className="flex items-center justify-between gap-3 px-4 py-4 md:block">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-[var(--color-accent)]">QuietPay</p>
-            <p className="truncate font-semibold">{session.merchant.name}</p>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] bg-[var(--color-accent)] font-[family-name:var(--font-display)] text-lg font-bold shadow-[var(--shadow-brutal-sm)]" aria-hidden>
+              Q
+            </span>
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-wider text-[var(--color-muted)]">QuietPay</p>
+              <p className="truncate font-[family-name:var(--font-display)] text-lg font-bold leading-tight">{session.merchant.name}</p>
+            </div>
           </div>
-          <span className="rounded-full bg-[var(--color-warn)]/12 px-2 py-0.5 text-[11px] font-medium text-[var(--color-warn)] md:mt-2 md:inline-block">Test mode</span>
+          <span className="rounded-full border-2 border-[var(--color-ink)] bg-[var(--color-warn-soft)] px-2 py-0.5 text-[11px] font-black uppercase tracking-wider md:mt-3 md:inline-block">Test mode</span>
         </div>
-        <nav className="flex gap-1 overflow-x-auto px-2 pb-2 md:flex-col md:pb-0" aria-label="Dashboard">
+        <nav className="flex gap-1.5 overflow-x-auto px-3 pb-3 md:flex-col md:pb-0" aria-label="Dashboard">
           {nav.map((item) => {
             const active = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
             return (
@@ -197,21 +203,21 @@ function Frame({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`whitespace-nowrap rounded-md px-3 py-2 text-sm ${active ? "bg-[var(--color-accent)]/12 font-medium text-[var(--color-accent)]" : "hover:bg-[var(--color-bg)]"}`}
+                className={`whitespace-nowrap rounded-[var(--radius-base)] border-2 px-3 py-2 text-sm font-bold transition ${active ? "border-[var(--color-ink)] bg-[var(--color-accent)] shadow-[var(--shadow-brutal-sm)]" : "border-transparent hover:border-[var(--color-ink)] hover:bg-[var(--color-bg)]"}`}
               >
                 {item.label}
               </Link>
             );
           })}
         </nav>
-        <div className="mt-auto hidden border-t border-[var(--color-line)] p-4 text-xs text-[var(--color-muted)] md:block">
-          <p className="font-mono">{wallet.address ? shortAddress(wallet.address) : ""}</p>
-          <button type="button" onClick={signOut} className="mt-1 underline-offset-2 hover:underline">
+        <div className="mt-auto hidden border-t-2 border-[var(--color-ink)] p-4 text-xs md:block">
+          <p className="inline-block rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] bg-[var(--color-bg)] px-2 py-1 font-mono font-bold">{wallet.address ? shortAddress(wallet.address) : ""}</p>
+          <button type="button" onClick={signOut} className="mt-2 block font-bold text-[var(--color-muted)] underline-offset-2 hover:text-[var(--color-ink)] hover:underline">
             Sign out
           </button>
         </div>
       </aside>
-      <div className="min-w-0 flex-1 px-4 py-6 sm:px-8">{children}</div>
+      <div className="min-w-0 flex-1 px-4 py-6 sm:px-8 sm:py-8">{children}</div>
     </div>
   );
 }

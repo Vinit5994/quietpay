@@ -1,32 +1,54 @@
 @import "tailwindcss";
 
-/* Placeholder design tokens. The visual design is the developer's call (see docs/WORK_SPLIT.md "UI"). */
+/*
+ * QuietPay design tokens: neo-brutalist look (thick borders, hard offset shadows, flat bold colour).
+ * Button/card recipes adapted from neobrutalism-components (MIT, (c) 2023 Samuel Breznjak).
+ */
 @theme {
-  --color-bg: #f6f7f9;
+  --color-bg: #fbf5e6;
   --color-surface: #ffffff;
-  --color-ink: #14181f;
-  --color-muted: #5b6472;
-  --color-line: #e2e6ec;
-  --color-accent: #2f5bea;
-  --color-accent-ink: #ffffff;
-  --color-good: #0f8a5f;
-  --color-warn: #b26a00;
-  --color-bad: #c23934;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-ink: #000000;
+  --color-muted: #4b4b4b;
+  --color-line: #000000;
+  --color-accent: #ffdc58;
+  --color-accent-ink: #000000;
+  --color-link: #2f4ad8;
+  --color-good: #127a4a;
+  --color-warn: #9a5b00;
+  --color-bad: #c4302b;
+  /* Soft fills used for chips, notices and icon tiles */
+  --color-good-soft: #a7f0c8;
+  --color-warn-soft: #ffe08a;
+  --color-bad-soft: #ffb3ad;
+  --color-info-soft: #c9d6ff;
+  --color-neutral-soft: #ecebe6;
+
+  --radius-base: 6px;
+  --shadow-brutal: 4px 4px 0 0 var(--color-ink);
+  --shadow-brutal-sm: 2px 2px 0 0 var(--color-ink);
+  --shadow-brutal-lg: 8px 8px 0 0 var(--color-ink);
+
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-heading), var(--font-body), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #0e1116;
-    --color-surface: #161b22;
-    --color-ink: #e8ecf1;
-    --color-muted: #9aa4b2;
-    --color-line: #262d38;
-    --color-accent: #6d8cff;
-    --color-accent-ink: #0e1116;
-  }
-}
-
 html, body { background: var(--color-bg); color: var(--color-ink); }
+body {
+  /* Faint dot grid, a common neo-brutalist backdrop */
+  background-image: radial-gradient(color-mix(in srgb, var(--color-ink) 9%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.01em; }
 .tabular { font-variant-numeric: tabular-nums; }
+
+/* Press-into-shadow interaction shared by buttons and clickable cards */
+.nb-press {
+  box-shadow: var(--shadow-brutal);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.nb-press:not(:disabled):hover { transform: translate(2px, 2px); box-shadow: var(--shadow-brutal-sm); }
+.nb-press:not(:disabled):active { transform: translate(4px, 4px); box-shadow: none; }
+@media (prefers-reduced-motion: reduce) {
+  .nb-press { transition: none; }
+}
