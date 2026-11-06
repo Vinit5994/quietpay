@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { ProductArt } from "@/components/ProductArt";
+import { ProductImage } from "@/components/ProductImage";
 import { useCart } from "@/lib/cart";
 import { findProduct } from "@/lib/products";
 import { formatUsdt, lineTotal } from "@/lib/money";
@@ -42,8 +42,11 @@ export function CartView() {
           const p = findProduct(item.productId)!;
           return (
             <li key={`${item.productId}-${item.size}`} className="flex gap-4 py-5 sm:gap-6">
-              <Link href={`/p/${p.id}`} className="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg border border-[var(--color-cream-line)] bg-[var(--color-cream)] p-2">
-                <ProductArt kind={p.kind} base={p.colors.base} accent={p.colors.accent} className="h-full w-full" />
+              <Link
+                href={`/p/${p.id}`}
+                className={`relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--color-cream-line)] bg-[var(--color-cream)] ${p.photos?.length ? "" : "p-2"}`}
+              >
+                <ProductImage product={p} sizes="96px" />
               </Link>
               <div className="flex min-w-0 flex-1 flex-col justify-between gap-2 sm:flex-row sm:items-center">
                 <div className="min-w-0">

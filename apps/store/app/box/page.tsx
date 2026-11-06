@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ProductArt } from "@/components/ProductArt";
+import { ProductImage } from "@/components/ProductImage";
 import { Sparkle } from "@/components/Sparkle";
 import { builderBox } from "@/lib/products";
 import { formatUsdt } from "@/lib/money";
@@ -10,8 +10,8 @@ export const metadata: Metadata = { title: "Builder Box" };
 export default function BoxPage() {
   return (
     <main className="mx-auto grid w-full max-w-6xl items-center gap-10 px-4 pt-10 sm:px-6 md:grid-cols-2">
-      <div className="relative flex aspect-square items-center justify-center rounded-2xl border border-[var(--color-cream-line)] bg-[var(--color-cream)] p-12">
-        <ProductArt kind={builderBox.kind} base={builderBox.colors.base} accent={builderBox.colors.accent} className="h-full w-full max-w-sm" />
+      <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl border border-[var(--color-cream-line)] bg-[var(--color-cream)]">
+        <ProductImage product={builderBox} sizes="(min-width: 768px) 50vw, 100vw" priority />
         <Sparkle size={44} className="absolute right-8 top-8" />
       </div>
       <div>
