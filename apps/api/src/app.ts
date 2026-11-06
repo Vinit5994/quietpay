@@ -5,9 +5,17 @@ import type { AppEnv, Deps } from "./deps";
 import { onError } from "./lib/errors";
 import { publicRoutes } from "./routes/public";
 import { Relayer } from "./relayer";
+import { Dispatcher } from "./webhooks";
 import { v1Routes } from "./routes/v1";
 
-export function createApp(deps: Deps, relayer: Relayer = new Relayer(deps)) {
+export type Services = { relayer: Relayer; dispatcher: Dispatcher };
+
+export function createServices(deps: Deps): Services {
+  return { relayer: new Relayer(deps), dispatcher: new Dispatcher(deps) };
+}
+
+export function createApp(deps: Deps, services: Services = createServices(deps)) {
+  const { relayer, dispatcher } = services;
   const app = new Hono<AppEnv>();
 
   // The web app (checkout, dashboard, portal) calls us from the browser.
@@ -22,7 +30,7 @@ export function createApp(deps: Deps, relayer: Relayer = new Relayer(deps)) {
 
   app.get("/", (c) => c.json({ name: "quietpay-api", ok: true }));
   app.route("/auth", authRoutes(deps));
-  app.route("/v1", v1Routes(deps));
+  app.route("/v1", v1Routes(deps, dispatcher));
   app.route("/public", publicRoutes(deps, relayer));
 
   app.notFound((c) => c.json({ error: { code: "not_found", message: `No route ${c.req.method} ${c.req.path}.` } }, 404));
