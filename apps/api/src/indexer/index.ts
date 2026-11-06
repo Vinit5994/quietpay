@@ -6,6 +6,8 @@ import { chainEvents, checkoutSessions, indexerCursor, merchants } from "../db/s
 import type { Deps, MerchantRow } from "../deps";
 import { isoFromSeconds, nowSeconds } from "../lib/ids";
 import { recordCheckoutPayment } from "../services/payments";
+import { onRefunded } from "../services/refunds";
+import { onRenewalFailed, onRenewed, onSubscribed, onSubscriptionCanceled, onSubscriptionPayment } from "../services/subscriptions";
 import { enqueueWebhook } from "../webhooks";
 
 export const MAX_BLOCK_RANGE = 2_000n;
@@ -49,7 +51,7 @@ export class Indexer {
         const to = from + MAX_BLOCK_RANGE - 1n < latest ? from + MAX_BLOCK_RANGE - 1n : latest;
         this.store(await this.deps.chain.quietPayLogs(from, to), to);
       }
-      this.processPending();
+      await this.processPending();
     } finally {
       this.running = false;
     }
@@ -78,14 +80,14 @@ export class Indexer {
   }
 
   /** Processes stored events in insertion (= chain) order; each event is handled exactly once. */
-  processPending() {
+  async processPending() {
     const { db } = this.deps;
     const pending = db.select().from(chainEvents).where(isNull(chainEvents.processedAt)).orderBy(sql`rowid`).all();
     // block_number is TEXT; stable numeric sort keeps log order inside a block (rowid = insertion = chain order)
     pending.sort((a, b) => (BigInt(a.blockNumber) < BigInt(b.blockNumber) ? -1 : BigInt(a.blockNumber) > BigInt(b.blockNumber) ? 1 : 0));
     for (const ev of pending) {
       try {
-        this.handle(ev.name, JSON.parse(ev.argsJson), ev.id.split(":")[0] as Hex, BigInt(ev.blockNumber));
+        await this.handle(ev.name, JSON.parse(ev.argsJson), ev.id.split(":")[0] as Hex, BigInt(ev.blockNumber));
       } catch (err) {
         console.error(`[indexer] failed to process ${ev.name} ${ev.id}`, err);
         continue; // retried next tick
@@ -98,13 +100,33 @@ export class Indexer {
     return this.deps.db.select().from(merchants).where(eq(merchants.onchainId, id)).get();
   }
 
-  private handle(name: string, args: Record<string, string | number>, txHash: Hex, blockNumber: bigint) {
+  private async handle(name: string, args: Record<string, string | number>, txHash: Hex, blockNumber: bigint) {
+    const big = (k: string) => BigInt(args[k]!);
     switch (name) {
       case "PaymentReceived":
         if (Number(args.kind) === 0) return this.onCheckoutPayment(args, txHash, blockNumber);
-        return; // subscription charges: A9
+        return onSubscriptionPayment(
+          this.deps,
+          { paymentId: args.paymentId as Hex, subId: big("subId"), payer: String(args.payer), amount: big("amount"), fee: big("fee") },
+          txHash,
+          blockNumber,
+        );
+      case "Subscribed":
+        return onSubscribed(this.deps, { subId: big("subId"), planId: big("planId"), subscriber: String(args.subscriber) }, txHash);
+      case "Renewed":
+        return onRenewed(this.deps, { subId: big("subId"), cycle: Number(args.cycle), paymentId: args.paymentId as Hex }, txHash);
+      case "RenewalFailed":
+        return onRenewalFailed(this.deps, { subId: big("subId"), attemptedCycle: Number(args.attemptedCycle) }, txHash);
+      case "SubscriptionCanceled":
+        return onSubscriptionCanceled(this.deps, { subId: big("subId"), reason: Number(args.reason) }, txHash);
+      case "Refunded":
+        return onRefunded(
+          this.deps,
+          { paymentId: args.paymentId as Hex, merchantId: big("merchantId"), seq: Number(args.seq), amount: big("amount"), totalRefunded: big("totalRefunded") },
+          txHash,
+        );
       default:
-        return; // MerchantRegistered, PlanCreated, OperatorSet, …: nothing to do; subscriptions/refunds: A9/A10
+        return; // MerchantRegistered, PlanCreated, OperatorSet, …: nothing to do
     }
   }
 

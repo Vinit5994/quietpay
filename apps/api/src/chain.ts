@@ -40,6 +40,16 @@ export type ChainEvent = {
   logIndex: number;
 };
 
+/** QuietPay `subs(subId)`; status 0 None, 1 Active, 2 PastDue, 3 Canceled. */
+export type OnchainSub = {
+  planId: bigint;
+  subscriber: Address;
+  nextChargeAt: bigint;
+  pastDueSince: bigint;
+  cycle: number;
+  status: number;
+};
+
 export type TxReceipt = {
   status: "success" | "reverted";
   blockNumber: bigint;
@@ -58,6 +68,16 @@ export interface Chain {
   verifyTypedData(args: TypedDataDefinition & { address: Address; signature: Hex }): Promise<boolean>;
   /** Operator call used by the seed script and onboarding. */
   registerMerchant(payout: Address, signer: Address): Promise<{ merchantId: bigint; txHash: Hex }>;
+
+  /** QuietPay sigNonces(addr): nonce for Subscribe / CancelSubscription signatures. */
+  sigNonce(owner: Address): Promise<bigint>;
+  /** USDT EIP-2612 nonces(owner). */
+  usdtNonce(owner: Address): Promise<bigint>;
+  /** USDT allowance(owner → QuietPay). */
+  usdtAllowance(owner: Address): Promise<bigint>;
+  readSub(subId: bigint): Promise<OnchainSub>;
+  /** QuietPay refundCount(paymentId): the next refund's sequence number. */
+  refundCount(paymentId: Hex): Promise<number>;
 
   gasPrice(): Promise<bigint>;
   relayerBalance(): Promise<bigint>;
@@ -99,6 +119,25 @@ export function createChain(env: Env): Chain {
       if (!log) throw new Error(`MerchantRegistered not found in ${txHash}`);
       return { merchantId: log.args.merchantId, txHash };
     },
+
+    sigNonce: (owner) =>
+      publicClient.readContract({ address: quietPay, abi: quietPayAbi, functionName: "sigNonces", args: [owner] }),
+    usdtNonce: (owner) =>
+      publicClient.readContract({ address: USDT_ADDRESS, abi: usdtAbi, functionName: "nonces", args: [owner] }),
+    usdtAllowance: (owner) =>
+      publicClient.readContract({ address: USDT_ADDRESS, abi: usdtAbi, functionName: "allowance", args: [owner, quietPay] }),
+    async readSub(subId) {
+      const [planId, subscriber, nextChargeAt, pastDueSince, cycle, status] = await publicClient.readContract({
+        address: quietPay,
+        abi: quietPayAbi,
+        functionName: "subs",
+        args: [subId],
+      });
+      return { planId, subscriber, nextChargeAt, pastDueSince, cycle, status };
+    },
+
+    refundCount: async (paymentId) =>
+      Number(await publicClient.readContract({ address: quietPay, abi: quietPayAbi, functionName: "refundCount", args: [paymentId] })),
 
     gasPrice: () => publicClient.getGasPrice(),
     relayerBalance: () => publicClient.getBalance({ address: relayer.address }),

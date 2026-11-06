@@ -33,6 +33,10 @@ contracts/broadcast/*/31337
 contracts/broadcast/**/dry-run
 *.recovery.lock
 
+# Agent skills belong in your home folder, never in the repo (WORK_SPLIT §2)
+.agents/
+skills-lock.json
+
 # OS / editor
 .DS_Store
 .vscode

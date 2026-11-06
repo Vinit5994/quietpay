@@ -7,6 +7,7 @@ import { publicRoutes } from "./routes/public";
 import { Relayer } from "./relayer";
 import { Dispatcher } from "./webhooks";
 import { v1Routes } from "./routes/v1";
+import { dashRoutes } from "./routes/dash";
 
 export type Services = { relayer: Relayer; dispatcher: Dispatcher };
 
@@ -30,8 +31,9 @@ export function createApp(deps: Deps, services: Services = createServices(deps))
 
   app.get("/", (c) => c.json({ name: "quietpay-api", ok: true }));
   app.route("/auth", authRoutes(deps));
-  app.route("/v1", v1Routes(deps, dispatcher));
+  app.route("/v1", v1Routes(deps, relayer, dispatcher));
   app.route("/public", publicRoutes(deps, relayer));
+  app.route("/dash", dashRoutes(deps, relayer));
 
   app.notFound((c) => c.json({ error: { code: "not_found", message: `No route ${c.req.method} ${c.req.path}.` } }, 404));
   app.onError(onError);

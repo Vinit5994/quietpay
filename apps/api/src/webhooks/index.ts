@@ -1,4 +1,4 @@
-import { and, asc, eq, lte } from "drizzle-orm";
+import { and, asc, eq, isNotNull, lte } from "drizzle-orm";
 import { signWebhook } from "@quietpay/node";
 import {
   WEBHOOK_RETRY_DELAYS_SECONDS,
@@ -87,8 +87,26 @@ export class Dispatcher {
     }
   }
 
-  /** Delivers one row now and records the result. */
+  /**
+   * Delivers one row now and records the result. The row is claimed first (attempts must still match),
+   * so the 1s loop and "send test event" can never both send the same delivery.
+   */
   async attempt(row: DeliveryRow): Promise<DeliveryRow> {
+    const claimed = this.deps.db
+      .update(webhookDeliveries)
+      .set({ nextAttemptAt: null })
+      .where(
+        and(
+          eq(webhookDeliveries.id, row.id),
+          eq(webhookDeliveries.status, "pending"),
+          eq(webhookDeliveries.attempts, row.attempts),
+          isNotNull(webhookDeliveries.nextAttemptAt),
+        ),
+      )
+      .run();
+    if (claimed.changes === 0) {
+      return this.deps.db.select().from(webhookDeliveries).where(eq(webhookDeliveries.id, row.id)).get() ?? row;
+    }
     const merchant = this.deps.db.select().from(merchants).where(eq(merchants.id, row.merchantId)).get();
     const attempts = row.attempts + 1;
     let statusCode: number | null = null;

@@ -5,6 +5,9 @@ import type { Relayer } from "../relayer";
 import { readBody, send } from "../lib/validate";
 import { loadSession, prepareSession, toPublicSession } from "../services/sessions";
 import { sessionStatus, submitPayment } from "../services/submit";
+import { requireJwt } from "../auth";
+import { loadCustomerSubscription, prepareCustomerCancel, submitCustomerCancel } from "../services/subscriptions";
+import type { Hex } from "viem";
 
 function clientIp(c: Context): string {
   const forwarded = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
@@ -36,6 +39,20 @@ export function publicRoutes(deps: Deps, relayer: Relayer) {
   });
 
   app.get("/sessions/:id/status", (c) => send(c, "publicSessionStatus", sessionStatus(deps, c.req.param("id"))));
+
+  // ---- customer portal: cancel a subscription with a signature (gasless)
+  app.use("/portal/*", requireJwt(deps, "customer"));
+
+  app.post("/portal/subscriptions/:id/cancel/prepare", async (c) => {
+    const sub = loadCustomerSubscription(deps, c.get("jwt").sub, c.req.param("id"));
+    return send(c, "publicPortalCancelPrepare", await prepareCustomerCancel(deps, sub));
+  });
+
+  app.post("/portal/subscriptions/:id/cancel/submit", async (c) => {
+    const { signature } = await readBody(c, "publicPortalCancelSubmit");
+    const sub = loadCustomerSubscription(deps, c.get("jwt").sub, c.req.param("id"));
+    return send(c, "publicPortalCancelSubmit", await submitCustomerCancel(deps, relayer, sub, signature as Hex));
+  });
 
   return app;
 }

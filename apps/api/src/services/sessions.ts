@@ -7,7 +7,9 @@ import {
   invoiceTypedData,
   orderIdFromSessionId,
   paymentNonce,
+  permitTypedData,
   receiveWithAuthorizationTypedData,
+  subscribeTypedData,
   toJsonTypedData,
   toUnits,
   type BodyOf,
@@ -15,7 +17,7 @@ import {
   type PrepareSessionResponse,
   type PublicSession,
 } from "@quietpay/shared";
-import { checkoutSessions, merchants } from "../db/schema";
+import { checkoutSessions, merchants, plans } from "../db/schema";
 import type { Deps, MerchantRow } from "../deps";
 import { decrypt } from "../lib/crypto";
 import { ApiError, notFound } from "../lib/errors";
@@ -95,7 +97,7 @@ export function toPublicSession(deps: Deps, row: SessionRow, merchant: MerchantR
     lineItems: lineItemsOut(row),
     amount: fromUnits(BigInt(row.amountUnits)),
     currency: "USDT",
-    plan: null, // subscription terms arrive with A9
+    plan: planTerms(deps, row),
     successUrl: row.successUrl,
     cancelUrl: row.cancelUrl,
     paymentId: row.paymentId,
@@ -103,6 +105,65 @@ export function toPublicSession(deps: Deps, row: SessionRow, merchant: MerchantR
     explorerUrl: row.txHash ? explorerTx(row.txHash) : null,
     expiresAt: isoFromSeconds(row.expiresAt),
   };
+}
+
+/** Subscription terms for the checkout page ("15.00 USDT every 2 minutes, cap 180.00 over 12 periods"). */
+function planTerms(deps: Deps, row: SessionRow) {
+  if (row.mode !== "subscription" || !row.planId) return null;
+  const plan = deps.db.select().from(plans).where(eq(plans.id, row.planId)).get();
+  if (!plan) return null;
+  const amount = BigInt(plan.amountUnits);
+  return {
+    id: plan.id,
+    name: plan.name,
+    amount: fromUnits(amount),
+    periodSeconds: plan.periodSeconds,
+    graceSeconds: plan.graceSeconds,
+    spendingCap: fromUnits(amount * BigInt(SPENDING_CAP_PERIODS)),
+    capPeriods: SPENDING_CAP_PERIODS,
+  };
+}
+
+/** Number of periods the Permit allowance covers (SPEC_API: permit value = allowance + amount × 12). */
+export const SPENDING_CAP_PERIODS = 12 as const;
+
+async function createSubscriptionSession(
+  deps: Deps,
+  merchant: MerchantRow,
+  body: Extract<BodyOf<"createCheckoutSession">, { mode: "subscription" }>,
+): Promise<SessionRow> {
+  const plan = deps.db.select().from(plans).where(eq(plans.id, body.planId)).get();
+  if (!plan || plan.merchantId !== merchant.id) throw notFound("Plan");
+  if (!plan.active) throw new ApiError(409, "plan_inactive", "This plan is no longer available.");
+
+  const id = newId("sess");
+  const createdAt = nowSeconds();
+  const row: SessionRow = {
+    id,
+    merchantId: merchant.id,
+    mode: "subscription",
+    status: "open",
+    amountUnits: plan.amountUnits,
+    lineItemsJson: JSON.stringify([{ name: plan.name, unitAmountUnits: plan.amountUnits, quantity: 1 }]),
+    planId: plan.id,
+    reference: body.reference,
+    customerEmail: body.customerEmail ?? null,
+    orderIdHex: orderIdFromSessionId(id),
+    invoiceSig: null,
+    expiresAt: createdAt + DEFAULT_EXPIRES_IN,
+    successUrl: body.successUrl,
+    cancelUrl: body.cancelUrl,
+    payerAddress: null,
+    paymentId: null,
+    subscriptionId: null,
+    txHash: null,
+    paymentLinkId: null,
+    lastError: null,
+    preparedJson: null,
+    createdAt,
+  };
+  deps.db.insert(checkoutSessions).values(row).run();
+  return row;
 }
 
 /** The merchant's invoice signer (key encrypted at rest with ENCRYPTION_KEY). */
@@ -116,9 +177,7 @@ export async function createCheckoutSession(
   body: BodyOf<"createCheckoutSession">,
   opts: { paymentLinkId?: string } = {},
 ): Promise<SessionRow> {
-  if (body.mode !== "payment") {
-    throw new ApiError(400, "bad_request", "Subscription checkout is not available yet.");
-  }
+  if (body.mode === "subscription") return createSubscriptionSession(deps, merchant, body);
   const { stored, total } = priceLineItems(body.lineItems);
   if (total < MIN_AMOUNT_UNITS) {
     throw new ApiError(422, "amount_below_minimum", `Minimum checkout is ${fromUnits(MIN_AMOUNT_UNITS)} USDT.`);
@@ -160,6 +219,7 @@ export async function createCheckoutSession(
     txHash: null,
     paymentLinkId: opts.paymentLinkId ?? null,
     lastError: null,
+    preparedJson: null,
     createdAt,
   };
   deps.db.insert(checkoutSessions).values(row).run();
@@ -196,7 +256,7 @@ export function paymentAuthorization(deps: Deps, row: SessionRow, merchant: Merc
 export async function prepareSession(deps: Deps, id: string, payerInput: string): Promise<PrepareSessionResponse> {
   const { row, merchant } = loadSession(deps, id);
   assertOpen(deps, row);
-  if (row.mode !== "payment") throw new ApiError(400, "bad_request", "Subscription checkout is not available yet.");
+  if (row.mode === "subscription") return prepareSubscription(deps, row, getAddress(payerInput));
 
   const payer = getAddress(payerInput);
   const amount = BigInt(row.amountUnits);
@@ -210,5 +270,61 @@ export async function prepareSession(deps: Deps, id: string, payerInput: string)
     balance: fromUnits(balance),
     sufficientBalance: balance >= amount,
     typedData: { payment: toJsonTypedData(paymentAuthorization(deps, row, merchant, payer)) as never },
+  };
+}
+
+/** What the subscriber signs: Subscribe (QuietPay domain) then Permit (USDT domain). Stored for /submit. */
+export type PreparedSubscription = {
+  payer: Address;
+  onchainPlanId: string;
+  subscribe: ReturnType<typeof toJsonTypedData<ReturnType<typeof subscribeTypedData>>>;
+  permit: ReturnType<typeof toJsonTypedData<ReturnType<typeof permitTypedData>>>;
+};
+
+async function prepareSubscription(deps: Deps, row: SessionRow, payer: Address): Promise<PrepareSessionResponse> {
+  const plan = deps.db.select().from(plans).where(eq(plans.id, row.planId!)).get();
+  if (!plan) throw notFound("Plan");
+  if (!plan.active) throw new ApiError(409, "plan_inactive", "This plan is no longer available.");
+
+  const amount = BigInt(plan.amountUnits);
+  const cap = amount * BigInt(SPENDING_CAP_PERIODS);
+  const deadline = BigInt(row.expiresAt);
+  const [balance, sigNonce, allowance, permitNonce] = await Promise.all([
+    deps.chain.usdtBalance(payer),
+    deps.chain.sigNonce(payer),
+    deps.chain.usdtAllowance(payer),
+    deps.chain.usdtNonce(payer),
+  ]);
+
+  const prepared: PreparedSubscription = {
+    payer,
+    onchainPlanId: plan.onchainPlanId,
+    subscribe: toJsonTypedData(
+      subscribeTypedData(deps.chain.quietPay, {
+        planId: BigInt(plan.onchainPlanId),
+        subscriber: payer,
+        maxAmount: amount,
+        nonce: sigNonce,
+        deadline,
+      }),
+    ),
+    permit: toJsonTypedData(
+      permitTypedData({ owner: payer, spender: deps.chain.quietPay, value: allowance + cap, nonce: permitNonce, deadline }),
+    ),
+  };
+  deps.db
+    .update(checkoutSessions)
+    .set({ payerAddress: payer, preparedJson: JSON.stringify(prepared) })
+    .where(eq(checkoutSessions.id, row.id))
+    .run();
+
+  return {
+    mode: "subscription",
+    payer,
+    amount: fromUnits(amount),
+    balance: fromUnits(balance),
+    sufficientBalance: balance >= amount,
+    spendingCap: fromUnits(cap),
+    typedData: { subscribe: prepared.subscribe as never, permit: prepared.permit as never },
   };
 }
