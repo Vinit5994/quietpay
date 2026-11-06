@@ -1,5 +1,13 @@
 export type ArtKind = "hoodie" | "tee" | "cap" | "stickers" | "box";
 
+export interface ProductPhoto {
+  /** path under /public */
+  src: string;
+  alt: string;
+  /** object-position for square crops, e.g. "50% 35%" */
+  focus?: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -9,6 +17,8 @@ export interface Product {
   /** main garment colour + accent for the illustration */
   colors: { base: string; accent: string };
   sizes: string[] | null;
+  /** Real photos (first = main). Without photos the code-drawn art is shown. */
+  photos?: ProductPhoto[];
   tagline: string;
   description: string;
   /** Subscription product: bought on /box instead of the cart */
@@ -21,11 +31,15 @@ export const products: Product[] = [
     name: "Builder Hoodie",
     price: "25.00",
     kind: "hoodie",
-    colors: { base: "#1f2233", accent: "#fbbf24" },
+    colors: { base: "#f3f4f6", accent: "#6d5dfc" },
     sizes: ["S", "M", "L", "XL", "2XL"],
+    photos: [
+      { src: "/products/hoodie-front.jpg", alt: "Person wearing the white Builder Hoodie, front view", focus: "50% 42%" },
+      { src: "/products/hoodie-back.jpg", alt: "White Builder Hoodie seen from the back with the hood up", focus: "50% 38%" },
+    ],
     tagline: "Heavyweight fleece for late-night shipping",
     description:
-      "A heavyweight fleece hoodie with an embroidered sparkle on the chest. Warm enough for an air-conditioned hacker hall at 4am.",
+      "A heavyweight white fleece hoodie with a roomy hood and kangaroo pocket. Warm enough for an air-conditioned hacker hall at 4am.",
   },
   {
     id: "ship-it-tee",
@@ -34,8 +48,9 @@ export const products: Product[] = [
     kind: "tee",
     colors: { base: "#f4f1e8", accent: "#6d5dfc" },
     sizes: ["S", "M", "L", "XL", "2XL"],
-    tagline: "Soft cotton, loud message",
-    description: "A soft cotton tee with a hand-drawn \"ship it\" print on the back. Pre-shrunk, so it survives the hotel laundry.",
+    photos: [{ src: "/products/tee.jpg", alt: "Plain white Ship-It Tee laid flat on a grey background" }],
+    tagline: "Soft cotton, everyday fit",
+    description: "A soft, pre-shrunk cotton tee in clean white, so it survives the hotel laundry and goes under every hoodie.",
   },
   {
     id: "counter-cap",
@@ -64,6 +79,7 @@ export const products: Product[] = [
     kind: "box",
     colors: { base: "#f2b8a2", accent: "#4f46e5" },
     sizes: null,
+    photos: [{ src: "/products/box.jpg", alt: "Kraft cardboard Builder Box on a cream background" }],
     tagline: "A fresh swag drop, every period",
     description:
       "A surprise box of limited swag delivered every period. Renews automatically in USDT, and you can cancel anytime.",

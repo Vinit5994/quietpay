@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ProductArt } from "@/components/ProductArt";
+import { ProductImage } from "@/components/ProductImage";
 import { ProductCard } from "@/components/ProductCard";
 import { Dot, Sparkle } from "@/components/Sparkle";
 import { builderBox, products, shopProducts } from "@/lib/products";
@@ -31,7 +31,9 @@ export default function Home() {
             className="absolute inset-x-0 bottom-[8%] h-[46%] -rotate-[8deg] rounded-[50%] border-b-[10px] border-[var(--color-navy)]"
             style={{ background: "linear-gradient(100deg, #f6b98f 0%, #b7a2e8 55%, #5b5bea 100%)" }}
           />
-          <ProductArt kind={hoodie.kind} base={hoodie.colors.base} accent={hoodie.colors.accent} className="absolute inset-x-[18%] bottom-[22%] top-0 drop-shadow-xl" />
+          <div className="absolute inset-x-[24%] bottom-[20%] top-0 overflow-hidden rounded-[28px] border-4 border-white bg-[#f3f4f6] shadow-xl">
+            <ProductImage product={hoodie} sizes="(min-width: 768px) 260px, 50vw" priority />
+          </div>
           <Sparkle size={52} className="float-slow absolute left-[6%] top-[14%]" />
           <Sparkle size={30} className="absolute right-[10%] top-[30%]" />
           <Sparkle size={64} className="float-slow absolute bottom-[26%] right-[2%]" />
@@ -52,9 +54,9 @@ export default function Home() {
           <div className="dotted-edge absolute right-0 top-0 -z-10 hidden h-1/2 w-24 rounded-tr-3xl md:block" />
           <Link
             href="/box"
-            className="m-4 flex aspect-square items-center justify-center rounded-xl border border-[var(--color-line)] bg-white p-10 shadow-sm md:m-0 md:my-10"
+            className="relative m-4 flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-[var(--color-line)] bg-white shadow-sm md:m-0 md:my-10"
           >
-            <ProductArt kind={builderBox.kind} base={builderBox.colors.base} accent={builderBox.colors.accent} className="h-full w-full max-w-[280px]" />
+            <ProductImage product={builderBox} sizes="(min-width: 768px) 420px, 90vw" />
           </Link>
           <div className="px-6 pb-10 md:px-10 md:py-12">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
