@@ -1,0 +1,4 @@
+@import "tailwindcss";
+
+/* Swag Counter follows ETHGlobal's visual style (references: docs/design/ethglobal-reference/), with our own name and logo. Styled in task B5. */
+:root { color-scheme: light; }
