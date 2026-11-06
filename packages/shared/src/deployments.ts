@@ -2,6 +2,6 @@
 import type { Address } from "viem";
 
 /** QuietPay on Whitechain Sepolia (null until A5 deploys it). */
-export const QUIETPAY_ADDRESS: Address | null = null;
+export const QUIETPAY_ADDRESS: Address | null = "0x8ed9E91D00CbeB77F492863dc101C073F9152aC5";
 /** Indexer start block. */
-export const QUIETPAY_DEPLOY_BLOCK: bigint | null = null;
+export const QUIETPAY_DEPLOY_BLOCK: bigint | null = 12390823n;
