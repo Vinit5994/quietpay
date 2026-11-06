@@ -1,6 +1,9 @@
-import { Planned } from "@/components/Planned";
+import type { Metadata } from "next";
+import { Receipt } from "./Receipt";
+
+export const metadata: Metadata = { title: "Receipt · QuietPay" };
 
 export default async function ReceiptPage({ params }: { params: Promise<{ paymentId: string }> }) {
   const { paymentId } = await params;
-  return <Planned title={`Receipt ${paymentId}`} task="B9" />;
+  return <Receipt paymentId={paymentId} />;
 }
