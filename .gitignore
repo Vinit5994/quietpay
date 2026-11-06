@@ -7,3 +7,31 @@
 /docs/SPEC_FRONTEND.md
 /docs/TASKS.md
 /docs/tasks/
+
+# Secrets
+.env*
+!.env.example
+
+# Dependencies and build output
+node_modules
+.next
+dist
+coverage
+*.tsbuildinfo
+next-env.d.ts
+
+# Databases
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Foundry
+contracts/out
+contracts/cache
+contracts/broadcast/*/31337
+
+# OS / editor
+.DS_Store
+.vscode
+.idea

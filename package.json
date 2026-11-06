@@ -1,0 +1,24 @@
+{
+  "name": "quietpay",
+  "private": true,
+  "packageManager": "pnpm@10.34.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:api": "pnpm --filter @quietpay/api dev",
+    "dev:web": "pnpm --filter @quietpay/web dev",
+    "dev:store": "pnpm --filter @swag-counter/store dev",
+    "dev:mock": "pnpm --filter @quietpay/mock-api dev",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r --filter '!@quietpay/contracts' test",
+    "test:contracts": "pnpm --filter @quietpay/contracts test",
+    "check:ownership": "bash scripts/check-ownership.sh",
+    "fix:lockfile": "bash scripts/fix-lockfile.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}

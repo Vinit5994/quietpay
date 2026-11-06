@@ -1,0 +1,9 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "tools/*"
+  - "contracts"
+
+onlyBuiltDependencies:
+  - esbuild
+  - better-sqlite3
