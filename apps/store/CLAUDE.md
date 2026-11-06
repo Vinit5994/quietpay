@@ -7,6 +7,6 @@ A demo merchant: a hackathon swag store that takes USDT through QuietPay. Port 3
 - Local dev while port 3000 is busy: `STORE_URL=http://localhost:3002 next start -p 3002`, and run the mock with `MOCK_WEBHOOK_URL=http://localhost:3002/api/webhooks/quietpay`.
 - Keep the checkout server action and the webhook route as short as in `docs/SPEC_FRONTEND.md`; they're shown in the demo video.
 - Webhooks are delivered at least once: treat the event `id` as an idempotency key.
-- Look: ETHGlobal's visual style from `docs/design/ethglobal-reference/`, with our own store name and logo (no ETHGlobal logo or artwork).
+- Look: ETHGlobal's visual style from `docs/design/ethglobal-reference/`, with our own store name. The header shows the official ETHGlobal logo next to "Swag Counter" (team decision); the footer must keep saying it's a demo merchant, not an official ETHGlobal store.
 - The store has its own small data store for orders and boxes; it never reads QuietPay's database.
 - Run: `pnpm dev` (port 3000), `pnpm typecheck`, `pnpm test`.

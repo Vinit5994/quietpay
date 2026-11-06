@@ -28,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <MobileNav />
           {children}
           <footer className="mx-auto mt-24 w-full max-w-6xl border-t border-[var(--color-line)] px-4 py-8 text-sm text-[var(--color-muted)] sm:px-6">
-            Swag Counter is a demo store for ETHGlobal Mumbai. Payments run on QuietPay in test USDT on Whitechain Sepolia.
+            Swag Counter is a demo merchant built at ETHGlobal Mumbai, not an official ETHGlobal store. Payments run on QuietPay in test USDT on Whitechain Sepolia.
           </footer>
         </CartProvider>
       </body>
