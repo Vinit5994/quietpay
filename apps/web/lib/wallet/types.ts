@@ -21,6 +21,8 @@ export interface Wallet {
    * Rejects with SignatureRejectedError when the person closes or declines the request.
    */
   signTypedData(payload: TypedDataJson, purpose: string): Promise<Hex>;
+  /** personal_sign a plain-text message (wallet sign-in). Same rejection behaviour as signTypedData. */
+  signMessage(message: string, purpose: string): Promise<Hex>;
 }
 
 export class SignatureRejectedError extends Error {

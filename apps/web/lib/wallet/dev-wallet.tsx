@@ -72,6 +72,15 @@ export function DevWalletProvider({ children }: { children: React.ReactNode }) {
     return acct.signTypedData(toSignable(payload) as Parameters<typeof acct.signTypedData>[0]);
   }, []);
 
+  const signMessage = useCallback(async (message: string, purpose: string) => {
+    const k = keyRef.current;
+    if (!k) throw new Error("Sign in first");
+    const approved = await new Promise<boolean>((resolve) => setPending({ purpose, resolve }));
+    setPending(null);
+    if (!approved) throw new SignatureRejectedError();
+    return privateKeyToAccount(k).signMessage({ message });
+  }, []);
+
   const wallet: Wallet = {
     status: !ready ? "loading" : account ? "signed_in" : "signed_out",
     address: account?.address ?? null,
@@ -80,6 +89,7 @@ export function DevWalletProvider({ children }: { children: React.ReactNode }) {
     login,
     logout,
     signTypedData,
+    signMessage,
   };
 
   return (
