@@ -1,4 +1,47 @@
 @import "tailwindcss";
 
-/* Swag Counter follows ETHGlobal's visual style (references: docs/design/ethglobal-reference/), with our own name and logo. Styled in task B5. */
+/*
+ * Swag Counter: follows ETHGlobal's swag store style (docs/design/ethglobal-reference/STYLE.md)
+ * with our own name, logo and artwork. Light theme only, like the reference.
+ */
+@theme {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-ink: #0a0a0a;
+  --color-heading: #111827;
+  --color-muted: #6b7280;
+  --color-line: #e5e7eb;
+  --color-cream: #fefdeb;
+  --color-cream-line: #f1edc4;
+  --color-primary: #2b2540;
+  --color-primary-hover: #3a3357;
+  --color-navy: #1e1b4b;
+  --color-star: #fbbf24;
+  --color-violet: #6d5dfc;
+  --color-good: #16a34a;
+  --color-warn: #b45309;
+  --color-bad: #dc2626;
+}
+
 :root { color-scheme: light; }
+html, body { background: #ffffff; color: var(--color-ink); }
+
+/* Soft pastel wash behind the header and hero (peach → lavender → mint, fading to white). */
+.pastel-wash {
+  background:
+    radial-gradient(60% 80% at 0% 0%, #fde7c8 0%, transparent 60%),
+    radial-gradient(50% 70% at 55% 0%, #ece4fb 0%, transparent 65%),
+    radial-gradient(45% 60% at 100% 10%, #dff7ee 0%, transparent 60%),
+    #ffffff;
+}
+
+.dotted-edge {
+  background-image: radial-gradient(#c7c3e6 1.5px, transparent 1.5px);
+  background-size: 22px 22px;
+}
+
+.tabular { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .float-slow { animation: float 6s ease-in-out infinite; }
+  @keyframes float { 50% { transform: translateY(-6px) rotate(4deg); } }
+}
