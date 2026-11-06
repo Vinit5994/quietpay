@@ -10,7 +10,8 @@
  *   SEED_WEBHOOK_URL     default http://localhost:3000/api/webhooks/quietpay (Swag Counter)
  *
  * Also creates the "Builder Box" plan on-chain (15.00 USDT every DEMO_PERIOD_OVERRIDE or 120s, 60s grace)
- * and prints QUIETPAY_BOX_PLAN_ID for the store.
+ * and prints QUIETPAY_BOX_PLAN_ID for the store, plus the "Sticker Pack" payment link (3.00 USDT, slug
+ * sticker-pack) for the counter QR (QUIETPAY_STICKER_LINK_URL).
  */
 import { eq } from "drizzle-orm";
 import { getAddress } from "viem";
@@ -18,7 +19,8 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { explorerTx } from "@quietpay/shared";
 import { createChain } from "./chain";
 import { openDb } from "./db/client";
-import { merchants, plans } from "./db/schema";
+import { merchants, paymentLinks, plans } from "./db/schema";
+import { createPaymentLink, linkUrl } from "./services/links";
 import type { MerchantRow } from "./deps";
 import { Relayer } from "./relayer";
 import { createPlan } from "./services/plans";
@@ -37,6 +39,17 @@ const deps = { env, db, chain };
 
 const BOX_PLAN = "Builder Box";
 
+/** Creates the Sticker Pack payment link once per merchant and prints its URL. */
+async function ensureStickerLink(merchant: MerchantRow) {
+  let link = db.select().from(paymentLinks).all().find((l) => l.merchantId === merchant.id && l.title === "Sticker Pack");
+  if (!link) {
+    const created = await createPaymentLink(deps, merchant, { title: "Sticker Pack", amount: "3.00" }, { slug: "sticker-pack" });
+    link = db.select().from(paymentLinks).where(eq(paymentLinks.id, created.id)).get()!;
+    console.log(`Created payment link Sticker Pack (3.00 USDT): ${created.url}`);
+  }
+  console.log(`QUIETPAY_STICKER_LINK_URL=${linkUrl(deps, link.slug)}`);
+}
+
 /** Creates the Builder Box plan once per merchant and prints its id. */
 async function ensureBoxPlan(merchant: MerchantRow) {
   let plan = db.select().from(plans).where(eq(plans.name, BOX_PLAN)).all().find((p) => p.merchantId === merchant.id);
@@ -51,6 +64,7 @@ async function ensureBoxPlan(merchant: MerchantRow) {
     console.log(`Created plan ${BOX_PLAN} on-chain #${plan.onchainPlanId}: 15.00 USDT every ${plan.periodSeconds}s, grace ${plan.graceSeconds}s`);
   }
   console.log(`\nPut in apps/store/.env:\nQUIETPAY_BOX_PLAN_ID=${plan.id}`);
+  await ensureStickerLink(merchant);
 }
 
 function printKeys(secretKey: string, webhookSecret: string) {

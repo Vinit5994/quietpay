@@ -200,3 +200,11 @@ export const authNonces = sqliteTable("auth_nonces", {
   nonce: text("nonce").notNull(),
   expiresAt: integer("expires_at").notNull(),
 });
+
+/** WBT transfers a merchant sent to the relayer to raise its gas budget (each tx counted once). */
+export const gasTopups = sqliteTable("gas_topups", {
+  txHash: text("tx_hash").primaryKey(),
+  merchantId: text("merchant_id").notNull(),
+  valueWei: text("value_wei").notNull(),
+  createdAt: integer("created_at").notNull(),
+});

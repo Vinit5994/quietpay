@@ -13,6 +13,8 @@ import { readQuery } from "../lib/validate";
 import { createPlan, listPlans, toPlan } from "../services/plans";
 import { cancelByMerchant, listSubscriptions, loadSubscription, toSubscription } from "../services/subscriptions";
 import { createRefund } from "../services/refunds";
+import { createPaymentLink, listPaymentLinks, toPaymentLink } from "../services/links";
+import { listPayments, paymentsCsv } from "../services/payments";
 
 /** Merchant API: secret key (SDK) or merchant dashboard JWT. */
 export function v1Routes(deps: Deps, relayer: Relayer, dispatcher: Dispatcher) {
@@ -52,6 +54,28 @@ export function v1Routes(deps: Deps, relayer: Relayer, dispatcher: Dispatcher) {
   app.post("/subscriptions/:id/cancel", async (c) => {
     const sub = loadSubscription(deps, c.get("merchant").id, c.req.param("id"));
     return send(c, "cancelSubscription", toSubscription(deps, await cancelByMerchant(deps, relayer, c.get("merchant"), sub)));
+  });
+
+  // ---- payment links
+  app.post("/payment_links", async (c) => {
+    const body = await readBody(c, "createPaymentLink");
+    return send(c, "createPaymentLink", await createPaymentLink(deps, c.get("merchant"), body));
+  });
+
+  app.get("/payment_links", (c) => {
+    readQuery(c, "listPaymentLinks");
+    return send(c, "listPaymentLinks", { data: listPaymentLinks(deps, c.get("merchant").id).map((l) => toPaymentLink(deps, l)), nextCursor: null });
+  });
+
+  // ---- payments + CSV export
+  app.get("/payments", (c) => send(c, "listPayments", listPayments(deps, c.get("merchant").id, readQuery(c, "listPayments"))));
+
+  app.get("/exports/payments.csv", (c) => {
+    const csv = paymentsCsv(deps, c.get("merchant").id);
+    return c.body(csv, 200, {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="quietpay-payments-${new Date().toISOString().slice(0, 10)}.csv"`,
+    });
   });
 
   // ---- refunds: created here, signed by the payout wallet in the dashboard (/dash/refunds/:id/*)

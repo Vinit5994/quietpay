@@ -8,6 +8,8 @@ import { sessionStatus, submitPayment } from "../services/submit";
 import { requireJwt } from "../auth";
 import { loadCustomerSubscription, prepareCustomerCancel, submitCustomerCancel } from "../services/subscriptions";
 import type { Hex } from "viem";
+import { openPaymentLink } from "../services/links";
+import { portal, receipt } from "../services/receipts";
 
 function clientIp(c: Context): string {
   const forwarded = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
@@ -40,8 +42,14 @@ export function publicRoutes(deps: Deps, relayer: Relayer) {
 
   app.get("/sessions/:id/status", (c) => send(c, "publicSessionStatus", sessionStatus(deps, c.req.param("id"))));
 
-  // ---- customer portal: cancel a subscription with a signature (gasless)
+  // ---- payment links and receipts (public)
+  app.get("/links/:slug", async (c) => send(c, "publicLink", await openPaymentLink(deps, c.req.param("slug"))));
+  app.get("/receipts/:paymentId", (c) => send(c, "publicReceipt", receipt(deps, c.req.param("paymentId"))));
+
+  // ---- customer portal (customer JWT): own subscriptions + payments; cancel with a signature (gasless)
+  app.use("/portal", requireJwt(deps, "customer"));
   app.use("/portal/*", requireJwt(deps, "customer"));
+  app.get("/portal", (c) => send(c, "publicPortal", portal(deps, c.get("jwt").sub)));
 
   app.post("/portal/subscriptions/:id/cancel/prepare", async (c) => {
     const sub = loadCustomerSubscription(deps, c.get("jwt").sub, c.req.param("id"));

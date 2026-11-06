@@ -76,6 +76,10 @@ export interface Chain {
   /** USDT allowance(owner → QuietPay). */
   usdtAllowance(owner: Address): Promise<bigint>;
   readSub(subId: bigint): Promise<OnchainSub>;
+  /** A native (WBT) transfer, for gas top-ups. null if not found / not mined. */
+  nativeTransfer(txHash: Hex): Promise<{ from: Address; to: Address | null; value: bigint; success: boolean } | null>;
+  /** Testnet demo helper: sends USDT from DEMO_TREASURY_PK. Not a QuietPay call, so it never goes through the relayer. */
+  demoTransfer(to: Address, amount: bigint): Promise<Hex>;
   /** QuietPay refundCount(paymentId): the next refund's sequence number. */
   refundCount(paymentId: Hex): Promise<number>;
 
@@ -134,6 +138,31 @@ export function createChain(env: Env): Chain {
         args: [subId],
       });
       return { planId, subscriber, nextChargeAt, pastDueSince, cycle, status };
+    },
+
+    async nativeTransfer(txHash) {
+      try {
+        const [tx, receipt] = await Promise.all([
+          publicClient.getTransaction({ hash: txHash }),
+          publicClient.getTransactionReceipt({ hash: txHash }),
+        ]);
+        return { from: tx.from, to: tx.to ?? null, value: tx.value, success: receipt.status === "success" };
+      } catch {
+        return null;
+      }
+    },
+
+    async demoTransfer(to, amount) {
+      if (!env.DEMO_TREASURY_PK) throw new Error("DEMO_TREASURY_PK is not set");
+      // same nonceManager as the relayer, so a shared key (treasury = relayer) can't collide on nonces
+      const treasury = privateKeyToAccount(env.DEMO_TREASURY_PK as Hex, { nonceManager });
+      console.log(`[demo] -> USDT(${USDT_ADDRESS}).transfer(${to}, ${amount}) from ${treasury.address}`);
+      return createWalletClient({ account: treasury, chain: whitechainSepolia, transport }).writeContract({
+        address: USDT_ADDRESS,
+        abi: usdtAbi,
+        functionName: "transfer",
+        args: [to, amount],
+      });
     },
 
     refundCount: async (paymentId) =>
