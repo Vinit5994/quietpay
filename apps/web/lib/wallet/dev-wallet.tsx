@@ -1,8 +1,9 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { WalletContext } from "./context";
 import { SignatureRejectedError, type Wallet } from "./types";
 import { toSignable, type TypedDataJson } from "./typed-data";
 
@@ -26,8 +27,6 @@ function writeKey(key: Hex | null) {
 }
 
 type Pending = { purpose: string; resolve: (ok: boolean) => void };
-
-const DevWalletContext = createContext<Wallet | null>(null);
 
 /**
  * Browser demo wallet: a key generated and kept in this browser. Used until Privy (B4), and as the
@@ -93,17 +92,11 @@ export function DevWalletProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <DevWalletContext.Provider value={wallet}>
+    <WalletContext.Provider value={wallet}>
       {children}
       {pending ? <SignPrompt purpose={pending.purpose} onAnswer={pending.resolve} /> : null}
-    </DevWalletContext.Provider>
+    </WalletContext.Provider>
   );
-}
-
-export function useDevWallet(): Wallet {
-  const w = useContext(DevWalletContext);
-  if (!w) throw new Error("useDevWallet must be used inside DevWalletProvider");
-  return w;
 }
 
 function SignPrompt({ purpose, onAnswer }: { purpose: string; onAnswer: (ok: boolean) => void }) {
