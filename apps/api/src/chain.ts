@@ -31,6 +31,15 @@ export const RELAY_FUNCTIONS = [
 ] as const;
 export type RelayFunction = (typeof RELAY_FUNCTIONS)[number];
 
+/** A decoded QuietPay event, as the indexer stores it. */
+export type ChainEvent = {
+  eventName: string;
+  args: Record<string, unknown>;
+  blockNumber: bigint;
+  transactionHash: Hex;
+  logIndex: number;
+};
+
 export type TxReceipt = {
   status: "success" | "reverted";
   blockNumber: bigint;
@@ -57,6 +66,10 @@ export interface Chain {
   /** Signs and broadcasts a QuietPay call from the relayer (nonce-managed). Returns the tx hash. */
   send(fn: RelayFunction, args: readonly unknown[]): Promise<Hex>;
   waitForReceipt(hash: Hex): Promise<TxReceipt>;
+
+  blockNumber(): Promise<bigint>;
+  /** QuietPay logs in [fromBlock, toBlock], decoded with the ABI, in chain order. */
+  quietPayLogs(fromBlock: bigint, toBlock: bigint): Promise<ChainEvent[]>;
 }
 
 export function createChain(env: Env): Chain {
@@ -112,6 +125,19 @@ export function createChain(env: Env): Chain {
         effectiveGasPrice: r.effectiveGasPrice,
         logs: r.logs,
       };
+    },
+
+    blockNumber: () => publicClient.getBlockNumber(),
+
+    async quietPayLogs(fromBlock, toBlock) {
+      const logs = await publicClient.getContractEvents({ address: quietPay, abi: quietPayAbi, fromBlock, toBlock, strict: true });
+      return logs.map((l) => ({
+        eventName: l.eventName,
+        args: l.args as Record<string, unknown>,
+        blockNumber: l.blockNumber,
+        transactionHash: l.transactionHash,
+        logIndex: l.logIndex,
+      }));
     },
   };
   return chain;
