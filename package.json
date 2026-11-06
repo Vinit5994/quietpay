@@ -16,7 +16,8 @@
     "check:ownership": "bash scripts/check-ownership.sh",
     "fix:lockfile": "bash scripts/fix-lockfile.sh",
     "abi:export": "tsx scripts/export-abi.ts",
-    "first-payment": "tsx scripts/first-payment.ts"
+    "first-payment": "tsx scripts/first-payment.ts",
+    "pay-session": "tsx scripts/pay-session.ts"
   },
   "devDependencies": {
     "@quietpay/shared": "workspace:*",
