@@ -32,6 +32,7 @@ Any new wallet starts with **100.00 USDT** (`MOCK_DEFAULT_BALANCE`). State reset
 | Call | Effect |
 |---|---|
 | `GET /mock/state` | Sessions, subscriptions and recent webhook deliveries |
+| `POST /mock/claim-demo-merchant {address}` | Make your wallet the payout wallet of the seeded Swag Counter merchant, so the dashboard signs in to it (with sample data) |
 | `POST /mock/set-balance {address, amount}` | Set a wallet's USDT balance (e.g. `"4.00"` to test "not enough funds") |
 | `GET /mock/balance/:address` | Read a balance |
 | `POST /mock/fail-next-renewal/:subId` | Renewals fail from now on: past due, then canceled after grace |
