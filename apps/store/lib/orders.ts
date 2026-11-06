@@ -41,9 +41,15 @@ export interface Box {
   id: string;
   status: BoxStatus;
   subscriptionId: string | null;
+  /** QuietPay checkout session id (subscription mode) */
+  sessionId: string | null;
   checkoutUrl: string | null;
   nextChargeAt: string | null;
+  pastDueSince: string | null;
+  cancelReason: "customer" | "nonpayment" | "merchant" | null;
+  /** 0 after the first charge, +1 per renewal (from QuietPay) */
   cycle: number;
+  lastTxUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -148,4 +154,31 @@ export function listBoxes(): Box[] {
 
 export function findBox(id: string): Box | undefined {
   return readData().boxes.find((b) => b.id === id);
+}
+
+export function createBox(): Box {
+  const box: Box = {
+    id: newId("box"),
+    status: "pending",
+    subscriptionId: null,
+    sessionId: null,
+    checkoutUrl: null,
+    nextChargeAt: null,
+    pastDueSince: null,
+    cancelReason: null,
+    cycle: 0,
+    lastTxUrl: null,
+    createdAt: now(),
+    updatedAt: now(),
+  };
+  update((d) => d.boxes.unshift(box));
+  return box;
+}
+
+export function setBox(id: string, patch: Partial<Omit<Box, "id">>): Box | undefined {
+  return update((d) => {
+    const b = d.boxes.find((x) => x.id === id);
+    if (b) Object.assign(b, patch, { updatedAt: now() });
+    return b;
+  });
 }

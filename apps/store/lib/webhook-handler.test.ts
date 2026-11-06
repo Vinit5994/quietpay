@@ -84,3 +84,44 @@ describe("QuietPay webhooks → orders", () => {
     expect(() => verifyWebhook(raw.replace("ping", "pong"), sig, SECRET)).toThrow();
   });
 });
+
+describe("QuietPay webhooks → Builder Box", () => {
+  const subData = (boxId: string, over: Record<string, unknown> = {}) => ({
+    merchantReference: boxId,
+    txHash: TX,
+    explorerUrl: EXPLORER,
+    subscriptionId: "sub_1",
+    planId: "plan_builder_box",
+    subscriberAddress: "0x1111111111111111111111111111111111111111",
+    status: "active",
+    cycle: 0,
+    amount: "15.00",
+    nextChargeAt: new Date(Date.now() + 120_000).toISOString(),
+    pastDueSince: null,
+    cancelReason: null,
+    paymentId: "pay_1",
+    attemptedCycle: null,
+    ...over,
+  });
+
+  it("created → renewed → past due → canceled", async () => {
+    const { createBox, findBox } = await import("./orders");
+    const box = createBox();
+    deliver("subscription.created", subData(box.id));
+    expect(findBox(box.id)).toMatchObject({ status: "active", subscriptionId: "sub_1", cycle: 0 });
+    deliver("subscription.renewed", subData(box.id, { cycle: 1 }));
+    expect(findBox(box.id)).toMatchObject({ status: "active", cycle: 1 });
+    deliver("subscription.payment_failed", subData(box.id, { status: "past_due", cycle: 1, pastDueSince: new Date().toISOString(), paymentId: null, attemptedCycle: 2 }));
+    expect(findBox(box.id)?.status).toBe("past_due");
+    deliver("subscription.canceled", subData(box.id, { status: "canceled", cycle: 1, nextChargeAt: null, cancelReason: "nonpayment", paymentId: null }));
+    expect(findBox(box.id)).toMatchObject({ status: "canceled", cancelReason: "nonpayment" });
+  });
+
+  it("a late retry of an older event never revives a canceled box", async () => {
+    const { createBox, findBox } = await import("./orders");
+    const box = createBox();
+    deliver("subscription.canceled", subData(box.id, { status: "canceled", nextChargeAt: null, cancelReason: "customer" }));
+    deliver("subscription.renewed", subData(box.id, { cycle: 3 }));
+    expect(findBox(box.id)?.status).toBe("canceled");
+  });
+});
