@@ -15,6 +15,13 @@
       "when": 1794000250197,
       "tag": "0001_subscriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794002446780,
+      "tag": "0002_gas_topups",
+      "breakpoints": true
     }
   ]
 }
