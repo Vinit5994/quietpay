@@ -1,5 +1,5 @@
 import "server-only";
-import { getOrder, setOrder, type Order } from "./orders";
+import { getOrder, setBox, setOrder, findBox, type Box, type Order } from "./orders";
 import { qp } from "./quietpay";
 
 /**
@@ -18,4 +18,17 @@ export async function syncPendingOrder(order: Order): Promise<Order> {
     console.warn("[sync] could not check session", order.sessionId, (err as Error).message);
   }
   return getOrder(order.id) ?? order;
+}
+
+/** Same safety net for a Builder Box that is still waiting for its first payment. */
+export async function syncPendingBox(box: Box): Promise<Box> {
+  if (box.status !== "pending" || !box.sessionId) return box;
+  try {
+    const session = await qp.checkout.sessions.retrieve(box.sessionId);
+    if (session.status === "complete") return setBox(box.id, { status: "active", subscriptionId: session.subscriptionId }) ?? box;
+    if (session.status === "expired") return setBox(box.id, { status: "canceled", cancelReason: null }) ?? box;
+  } catch (err) {
+    console.warn("[sync] could not check session", box.sessionId, (err as Error).message);
+  }
+  return findBox(box.id) ?? box;
 }
