@@ -113,6 +113,19 @@ describe("mock API", () => {
     if (event.type === "payment.succeeded") expect(event.data.merchantReference).toBe("order_42");
   });
 
+  it("subscription: prepare then submit with real signatures verifies under strict mode", async () => {
+    const { app } = await setup();
+    const account = privateKeyToAccount(generatePrivateKey());
+    const prep = (await (await app.request("/public/sessions/sess_demo_subscription/prepare", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ payer: account.address }) })).json()) as PrepareSessionResponse;
+    if (prep.mode !== "subscription") throw new Error("expected subscription");
+    expect(prep.spendingCap).toBe("180.00");
+    await wait(1_100); // a second later: typed data must still be identical
+    const sign = (td: Parameters<typeof signable>[0]) => account.signTypedData(signable(td) as unknown as Parameters<typeof account.signTypedData>[0]);
+    const signatures = { subscribe: await sign(prep.typedData.subscribe), permit: await sign(prep.typedData.permit) };
+    const submit = await app.request("/public/sessions/sess_demo_subscription/submit", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ payer: account.address, signatures }) });
+    expect(submit.status).toBe(202);
+  });
+
   it("rejects a bad signature when strict, and an already-paid session", async () => {
     const { app } = await setup();
     const account = privateKeyToAccount(generatePrivateKey());

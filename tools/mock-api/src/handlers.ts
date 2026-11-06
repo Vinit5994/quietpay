@@ -135,7 +135,8 @@ async function checkSignature(state: MockState, label: string, typedData: unknow
 /** Typed data with bigint uints (for verifying) for a session + payer. */
 function typedDataFor(state: MockState, s: SessionRec, payer: Address) {
   const merchant = state.merchants.find((m) => m.id === s.merchantId)!;
-  const deadline = unix(new Date(Date.now() + 30 * 60_000));
+  // Deterministic: prepare and submit must build byte-identical typed data, so never use "now" here.
+  const deadline = unix(s.expiresAt);
   if (s.mode === "payment") {
     return {
       payment: receiveWithAuthorizationTypedData({
