@@ -8,9 +8,14 @@ import { merchants } from "../db/schema";
 import { newWebhookSecret } from "../lib/crypto";
 import { createCheckoutSession, loadSession, toCheckoutSession } from "../services/sessions";
 import { enqueueWebhook, toWebhookDelivery, type Dispatcher } from "../webhooks";
+import type { Relayer } from "../relayer";
+import { readQuery } from "../lib/validate";
+import { createPlan, listPlans, toPlan } from "../services/plans";
+import { cancelByMerchant, listSubscriptions, loadSubscription, toSubscription } from "../services/subscriptions";
+import { createRefund } from "../services/refunds";
 
 /** Merchant API: secret key (SDK) or merchant dashboard JWT. */
-export function v1Routes(deps: Deps, dispatcher: Dispatcher) {
+export function v1Routes(deps: Deps, relayer: Relayer, dispatcher: Dispatcher) {
   const app = new Hono<AppEnv>();
   app.use("*", requireMerchantKey(deps));
 
@@ -24,6 +29,35 @@ export function v1Routes(deps: Deps, dispatcher: Dispatcher) {
     const { row } = loadSession(deps, c.req.param("id"));
     if (row.merchantId !== c.get("merchant").id) throw notFound("Checkout session");
     return send(c, "getCheckoutSession", toCheckoutSession(deps, row));
+  });
+
+  // ---- plans (on-chain createPlan through the relayer)
+  app.post("/plans", async (c) => {
+    const body = await readBody(c, "createPlan");
+    return send(c, "createPlan", toPlan(await createPlan(deps, relayer, c.get("merchant"), body)));
+  });
+
+  app.get("/plans", (c) => {
+    readQuery(c, "listPlans");
+    return send(c, "listPlans", { data: listPlans(deps, c.get("merchant").id).map(toPlan), nextCursor: null });
+  });
+
+  // ---- subscriptions
+  app.get("/subscriptions", (c) => {
+    const { status } = readQuery(c, "listSubscriptions");
+    const rows = listSubscriptions(deps, c.get("merchant").id, status);
+    return send(c, "listSubscriptions", { data: rows.map((r) => toSubscription(deps, r)), nextCursor: null });
+  });
+
+  app.post("/subscriptions/:id/cancel", async (c) => {
+    const sub = loadSubscription(deps, c.get("merchant").id, c.req.param("id"));
+    return send(c, "cancelSubscription", toSubscription(deps, await cancelByMerchant(deps, relayer, c.get("merchant"), sub)));
+  });
+
+  // ---- refunds: created here, signed by the payout wallet in the dashboard (/dash/refunds/:id/*)
+  app.post("/refunds", async (c) => {
+    const body = await readBody(c, "createRefund");
+    return send(c, "createRefund", createRefund(deps, c.get("merchant"), body));
   });
 
   /** Sets the webhook URL and returns a fresh signing secret (shown once; it rotates on every PUT). */
