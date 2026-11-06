@@ -1,0 +1,28 @@
+{
+  "name": "@quietpay/mock-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fake QuietPay API (port 4010) for frontend work before the real API is ready. Implements every endpoint in @quietpay/shared's endpoint map.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.0",
+    "@quietpay/shared": "link:./shared",
+    "hono": "^4.7.0",
+    "qrcode": "^1.5.4",
+    "viem": "^2.30.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/qrcode": "^1.5.5",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  }
+}
