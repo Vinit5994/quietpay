@@ -10,8 +10,8 @@ import {QuietPay} from "../src/QuietPay.sol";
 ///   USDT       token address (default: official Whitechain Sepolia USDT)
 ///   OWNER      final owner (default: the deployer). If it differs from the deployer, ownership is
 ///              handed over with Ownable2Step and OWNER must call acceptOwnership().
-///   RELAYER_A  Person A's API relayer (required)
-///   RELAYER_B  Person B's API relayer (optional; add later with setOperator)
+///   RELAYER_A_ADDRESS  Person A's API relayer (required)
+///   RELAYER_B_ADDRESS  Person B's API relayer (optional; add later with setOperator)
 ///
 /// Run (keys stay in your shell):
 ///   forge script script/Deploy.s.sol:Deploy --rpc-url whitechain_sepolia --private-key $DEPLOYER_PK --broadcast
@@ -19,13 +19,14 @@ contract Deploy is Script {
     address constant WHITECHAIN_SEPOLIA_USDT = 0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7;
 
     function run() external returns (QuietPay qp) {
-        address usdt = vm.envOr("USDT", WHITECHAIN_SEPOLIA_USDT);
-        address relayerA = vm.envAddress("RELAYER_A");
-        address relayerB = vm.envOr("RELAYER_B", address(0));
+        address usdt = _envAddressOr("USDT", WHITECHAIN_SEPOLIA_USDT);
+        address relayerA = _envAddressOr("RELAYER_A_ADDRESS", address(0));
+        require(relayerA != address(0), "set RELAYER_A_ADDRESS");
+        address relayerB = _envAddressOr("RELAYER_B_ADDRESS", address(0));
 
         vm.startBroadcast();
         (, address deployer,) = vm.readCallers();
-        address owner = vm.envOr("OWNER", deployer);
+        address owner = _envAddressOr("OWNER", deployer);
 
         console.log("chainId   ", block.chainid);
         console.log("deployer  ", deployer);
@@ -65,5 +66,11 @@ contract Deploy is Script {
         console.log("QuietPay  ", address(qp));
         console.log("block     ", deployBlock);
         console.log("written   ", path);
+    }
+
+    /// @dev Like vm.envOr, but an empty value (e.g. `OWNER=` in a sourced .env file) also means "use the default".
+    function _envAddressOr(string memory name, address fallback_) internal view returns (address) {
+        string memory raw = vm.envOr(name, string(""));
+        return bytes(raw).length == 0 ? fallback_ : vm.parseAddress(raw);
     }
 }

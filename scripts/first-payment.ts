@@ -7,7 +7,7 @@
  *  4. the relayer calls pay() and prints the explorer link
  *
  * Env (keys stay in your shell):
- *   RELAYER_PK          operator wallet, needs WBT
+ *   RELAYER_A_PK        your relayer (operator), needs WBT
  *   DEMO_TREASURY_PK    payer, needs >= AMOUNT USDT
  *   QUIETPAY_ADDRESS    default: packages/shared deployments.ts
  *   MERCHANT_PAYOUT     default: the relayer address
@@ -62,14 +62,14 @@ async function confirm(what: string) {
   }
 }
 
-const rpc = process.env.WHITECHAIN_SEPOLIA_RPC_URL ?? whitechainSepolia.rpcUrls.default.http[0];
-const quietPay = getAddress(process.env.QUIETPAY_ADDRESS ?? QUIETPAY_ADDRESS ?? env("QUIETPAY_ADDRESS"));
-const relayer = privateKeyToAccount(env("RELAYER_PK") as Hex);
+const rpc = process.env.WHITECHAIN_SEPOLIA_RPC_URL || whitechainSepolia.rpcUrls.default.http[0];
+const quietPay = getAddress(process.env.QUIETPAY_ADDRESS || QUIETPAY_ADDRESS || env("QUIETPAY_ADDRESS"));
+const relayer = privateKeyToAccount(env("RELAYER_A_PK") as Hex);
 const treasury = privateKeyToAccount(env("DEMO_TREASURY_PK") as Hex);
-const signerPk = (process.env.MERCHANT_SIGNER_PK ?? generatePrivateKey()) as Hex;
+const signerPk = (process.env.MERCHANT_SIGNER_PK || generatePrivateKey()) as Hex;
 const signer = privateKeyToAccount(signerPk);
-const payout: Address = getAddress(process.env.MERCHANT_PAYOUT ?? relayer.address);
-const amount = toUnits(process.env.AMOUNT ?? "1.00");
+const payout: Address = getAddress(process.env.MERCHANT_PAYOUT || relayer.address);
+const amount = toUnits(process.env.AMOUNT || "1.00");
 
 const publicClient = createPublicClient({ chain: whitechainSepolia, transport: http(rpc) });
 const wallet = createWalletClient({ account: relayer, chain: whitechainSepolia, transport: http(rpc) });

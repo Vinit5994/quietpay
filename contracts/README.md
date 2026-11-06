@@ -15,8 +15,8 @@ Keep keys in your shell. Never put them in a file.
 ```bash
 export WHITECHAIN_SEPOLIA_RPC_URL=https://rpc.testnet.whitechain.io
 export DEPLOYER_PK=0x...            # needs WBT (deploy + 2 setOperator ≈ 4.5M gas)
-export RELAYER_A=0x...              # Person A's API relayer
-export RELAYER_B=0x...              # Person B's API relayer (optional, can be added later)
+export RELAYER_A_ADDRESS=0x...      # Person A's API relayer
+export RELAYER_B_ADDRESS=0x...      # Person B's API relayer (optional, can be added later)
 export OWNER=0x...                  # optional; defaults to the deployer
 
 cd contracts
@@ -39,7 +39,7 @@ Then, from the repo root:
 
 ```bash
 pnpm abi:export                      # ABI + address into packages/shared
-RELAYER_PK=0x... DEMO_TREASURY_PK=0x... pnpm first-payment
+RELAYER_A_PK=0x... DEMO_TREASURY_PK=0x... pnpm first-payment
 ```
 
-Add a relayer later: `cast send $QP "setOperator(address,bool)" $RELAYER_B true --rpc-url whitechain_sepolia --private-key $DEPLOYER_PK`.
+Add a relayer later: `cast send $QP "setOperator(address,bool)" $RELAYER_B_ADDRESS true --rpc-url whitechain_sepolia --private-key $DEPLOYER_PK`.
