@@ -1,0 +1,16 @@
+{
+  "name": "@quietpay/contracts",
+  "private": true,
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test -vv",
+    "test:fork": "forge test --match-path test/Fork.t.sol --fork-url $WHITECHAIN_SEPOLIA_RPC_URL -vv",
+    "fmt": "forge fmt"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.4.0"
+  },
+  "devDependencies": {
+    "forge-std": "github:foundry-rs/forge-std#v1.10.0"
+  }
+}
