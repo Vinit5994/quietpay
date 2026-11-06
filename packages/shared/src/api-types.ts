@@ -96,6 +96,7 @@ export const ErrorCodes = [
   "fee_too_high",
   "invalid_amount",
   "enforced_pause",
+  "zero_address",
 ] as const;
 export const ErrorCode = z.enum(ErrorCodes);
 export type ErrorCode = z.infer<typeof ErrorCode>;

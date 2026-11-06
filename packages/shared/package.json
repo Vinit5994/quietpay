@@ -11,7 +11,8 @@
     "./money": "./src/money.ts",
     "./eip712": "./src/eip712.ts",
     "./api-types": "./src/api-types.ts",
-    "./abi": "./src/abi/index.ts"
+    "./abi": "./src/abi/index.ts",
+    "./deployments": "./src/deployments.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
