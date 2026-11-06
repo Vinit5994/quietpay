@@ -1,73 +1,51 @@
 # @quietpay/node
 
-Server-side client for the QuietPay API. It has no runtime dependencies beyond `fetch` and `node:crypto` (it imports types only from `@quietpay/shared`).
+The official Node.js SDK for **QuietPay**: accept **USDT on Whitechain** with hosted checkout, payment links, subscriptions, refunds and signed webhooks. Your customers never pay gas, pick a network or see a seed phrase. They sign in with Google or email and approve a single message. The money lands **directly in your own wallet**.
 
 ```ts
 import { QuietPay } from "@quietpay/node";
-
-const qp = new QuietPay(process.env.QUIETPAY_SECRET_KEY!, {
-  // optional; default: process.env.QUIETPAY_API_URL ?? "http://localhost:4000"
-  baseUrl: "http://localhost:4010", // the mock API, before the real one is ready
-});
-```
-
-| Call | Endpoint |
-|---|---|
-| `qp.checkout.sessions.create(params)` / `.retrieve(id)` | `POST/GET /v1/checkout/sessions` |
-| `qp.paymentLinks.create(params)` / `.list()` | `/v1/payment_links` |
-| `qp.plans.create(params)` / `.list()` | `/v1/plans` |
-| `qp.payments.list({ reference })` | `GET /v1/payments` |
-| `qp.subscriptions.list({ status })` / `.cancel(id)` | `/v1/subscriptions` |
-| `qp.refunds.create({ paymentId, amount, reason })` | `POST /v1/refunds` |
-| `qp.exports.paymentsCsv()` | `GET /v1/exports/payments.csv` |
-| `qp.webhookEndpoint.update({ url })` / `.test()` | `/v1/webhook_endpoint` |
-| `qp.webhooks.verify(rawBody, header, secret)` | local: checks `QuietPay-Signature` and returns the typed event |
-
-Amounts are decimal strings (`"25.00"`, max 2 decimals). Errors throw `QuietPayError` with `code` (for example `session_expired`), `message` and HTTP `status`. Network failures use code `network_error`, and bad webhook signatures use `invalid_webhook_signature`.
-
-Webhooks are delivered **at least once**, so treat `event.id` as an idempotency key. Signatures older than 5 minutes are rejected. `signWebhook(rawBody, secret)` builds a valid header, which the mock API and tests can use.
-
-## Store integration (Swag Counter)
-
-```ts
-// apps/store/app/cart/actions.ts
-"use server";
-import { redirect } from "next/navigation";
-import { QuietPay } from "@quietpay/node";
-import { createOrder } from "@/lib/orders";
 
 const qp = new QuietPay(process.env.QUIETPAY_SECRET_KEY!);
 
-export async function checkout(cart: CartItem[]) {
-  const order = await createOrder(cart);
-  const session = await qp.checkout.sessions.create({
-    mode: "payment",
-    reference: order.id,
-    lineItems: cart.map((i) => ({ name: i.name, unitAmount: i.price, quantity: i.qty })),
-    successUrl: `${process.env.STORE_URL}/orders/${order.id}`,
-    cancelUrl: `${process.env.STORE_URL}/cart`,
-  });
-  redirect(session.url);
-}
+const session = await qp.checkout.sessions.create({
+  mode: "payment",
+  reference: "order_1001",
+  lineItems: [{ name: "Builder Hoodie", unitAmount: "25.00", quantity: 1 }],
+  successUrl: "https://shop.example/orders/1001",
+  cancelUrl: "https://shop.example/cart",
+});
+
+// send the customer to session.url, then wait for the `payment.succeeded` webhook
 ```
 
-```ts
-// apps/store/app/api/webhooks/quietpay/route.ts
-export async function POST(req: Request) {
-  const event = qp.webhooks.verify(await req.text(), req.headers.get("quietpay-signature")!, process.env.QUIETPAY_WEBHOOK_SECRET!);
-  if (await alreadyHandled(event.id)) return new Response("ok");
-  if (event.type === "payment.succeeded") await markPaid(event.data.merchantReference, event.data.txHash);
-  if (event.type === "refund.succeeded") await markRefunded(event.data.merchantReference, event.data.amount);
-  if (event.type.startsWith("subscription.")) await syncBox(event.data);
-  return new Response("ok");
-}
-```
+- **Zero dependencies.** It uses only `fetch` and `node:crypto`, and needs Node 18 or later (22 recommended).
+- **Fully typed.** Every request and response type comes from the same schemas the QuietPay API validates against.
+- **Server-side only.** Your secret key must never reach a browser.
 
-## Using it from a Next.js app in this monorepo
+## Documentation
 
-The package ships TypeScript source, so add it to `transpilePackages`:
+| Guide | What you'll learn |
+|---|---|
+| [Getting started](docs/01-getting-started.md) | Keys, environments, your first payment end to end |
+| [Checkout](docs/02-checkout.md) | Checkout sessions, line items, amounts, expiry, statuses |
+| [Webhooks](docs/03-webhooks.md) | Verifying signatures, every event type, retries, idempotency |
+| [Subscriptions](docs/04-subscriptions.md) | Plans, the subscription lifecycle, failed payments, cancellation |
+| [Refunds](docs/05-refunds.md) | Partial and full refunds, the payout-wallet signature |
+| [Payment links and reporting](docs/06-payment-links-and-reporting.md) | QR payment links, listing payments, CSV export |
+| [Errors](docs/07-errors.md) | `QuietPayError`, every error code and what to do |
+| [API reference](docs/08-reference.md) | Every SDK method, parameter and returned object |
 
-```js
-// next.config.mjs
-export default { transpilePackages: ["@quietpay/node", "@quietpay/shared"] };
-```
+Runnable, typechecked examples are in [`examples/`](examples).
+
+## How it works, in one paragraph
+
+You create a **checkout session** on your server and redirect the customer to QuietPay's hosted page. The customer signs one EIP-3009 authorization ("move exactly 37.00 USDT to QuietPay for this order") with an embedded wallet. QuietPay's relayer submits it on-chain and pays the gas. The [QuietPay contract](https://explorer.testnet.whitechain.io/address/0x8ed9E91D00CbeB77F492863dc101C073F9152aC5) checks your signed invoice and moves the USDT straight to your payout wallet. A signed `payment.succeeded` webhook then tells your server the order is paid. Nobody, QuietPay included, can move a customer's money without their signature.
+
+## Network
+
+| | |
+|---|---|
+| Chain | Whitechain Sepolia (testnet), chain ID 1874 |
+| Token | USDT `0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7` (6 decimals) |
+| QuietPay contract | `0x8ed9E91D00CbeB77F492863dc101C073F9152aC5` (verified) |
+| Explorer | https://explorer.testnet.whitechain.io |

@@ -18,10 +18,11 @@ Every main-flow transaction uses the official test USDT `0xcedfB56113143d55b2358
 | **M2:** Swag Counter hoodie, 25.00 USDT via hosted checkout + Privy | https://explorer.testnet.whitechain.io/tx/0xb0696e753e80ce40e1ac677827bc50d2a766dc65f86cea8c86a25f92971c7026 | M2, store → `@quietpay/node` → /c/sess_… → Privy signs → relayer A pays gas → `payment.succeeded` → order Paid; block 12402867 |
 | M2: register Person B's Swag Counter (merchant #3) | https://explorer.testnet.whitechain.io/tx/0xa8c549428a78d7e7961f94d0af0877be59017eb5bbb3723076630fb3aa1e9718 | M2, B's local API seed |
 | M2: fund the demo customer (20.00 USDT) | https://explorer.testnet.whitechain.io/tx/0x102c72de80bc1402213612c6cd19dfab2b297839074693f7ae0f340420f0b707 | testnet funding of the Privy wallet, not part of checkout |
-| Payment link payment | | A11 |
-| Subscribe (first charge) | | A9 |
-| Renewal | | A9 |
+| Payment link payment (Sticker Pack, 3.00 USDT) | https://explorer.testnet.whitechain.io/tx/0xca989bc200392ebe34e1eae3be7e710272b7c9e994ec4b80639d42220d6317c4 | B10, `/l/sticker-pack` → fresh session → Privy signs; block 12407476 |
+| Subscribe (Builder Box, first charge 15.00 USDT) | https://explorer.testnet.whitechain.io/tx/0x7a120ed88d71504530f03c835542527830535a0380b10813013c70b61afb9b4f | B10, `Subscribed` (sub #1) + `PaymentReceived` kind 1 in one tx; Subscribe + Permit signatures |
+| Automatic renewal (keeper) | https://explorer.testnet.whitechain.io/tx/0x000724492798b2977057cb784fdb91d44f66ea65d40f79606893f4cc28cc5af0 | B10, `Renewed` cycle 1 + 15.00 USDT charge; sent by the keeper, customer did nothing |
 | Failed renewal (past due) | | A9 |
-| Cancel (nonpayment / customer) | | A9 |
-| Refund (partial) | | A10 |
-| Refund (second partial) | | A10 |
+| Cancel by customer (portal, gasless) | https://explorer.testnet.whitechain.io/tx/0xa77c063d4e4bd49822f63182ed78ee4a58a42816eb89583a78e80d33d8a6cb1e | B10, `SubscriptionCanceled` reason 0, CancelSubscription signature |
+| Cancel for nonpayment (after grace) | | A9, `pnpm subscription-demo` |
+| Refund (partial, 5.00 of 25.00 USDT) | https://explorer.testnet.whitechain.io/tx/0x82eef7948b0fda1181af54a58fc77672d44ccf6db5965346609c1e9f7ffc42d9 | B10, dashboard refund modal; payout wallet signed EIP-3009; `Refunded` seq 0 |
+| Refund (second partial) | | A10, `pnpm refund-demo` |

@@ -1,0 +1,6 @@
+# GitBook Git Sync. In GitBook, set the project directory to packages/sdk-node.
+root: ./docs/
+
+structure:
+  readme: README.md
+  summary: SUMMARY.md
