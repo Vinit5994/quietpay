@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import type { Address } from "viem";
 import { z } from "zod";
-import { endpoints, toUnits, type EndpointDef, type EndpointKey } from "@quietpay/shared";
+import { Endpoints, toUnits, type EndpointDef, type EndpointName } from "@quietpay/shared";
 import { chargeSubscription } from "./engine";
 import { handlers, MockError, type Caller } from "./handlers";
 import { SEEDED, getBalance, setBalance, toCheckoutSession, type MockState } from "./state";
@@ -14,18 +14,22 @@ function bearer(c: Context): string | null {
   return h?.startsWith("Bearer ") ? h.slice(7).trim() : null;
 }
 
-/** Mock tokens: secret key `sk_test_…`, or `mock.<role>.<address>` from /auth/verify. `mock.merchant.demo` = seeded merchant. */
+/**
+ * Mock tokens: secret key `sk_test_…`, or `mock.<role>.<address>` from /auth/verify. `mock.merchant.demo` = seeded merchant.
+ * "secret" endpoints accept a secret key OR a merchant token (the dashboard reuses /v1), like the real API.
+ */
 function resolveCaller(state: MockState, auth: EndpointDef["auth"], token: string | null): Caller {
-  if (auth === "public") return {};
+  if (auth === "none") return {};
   if (!token) throw new MockError("unauthorized", "Sign in first.", 401);
-  if (auth === "secret") {
+  if (auth === "secret" && token.startsWith("sk_")) {
     const merchant = state.merchants.find((m) => m.secretKey === token);
     if (!merchant) throw new MockError("unauthorized", "Invalid secret key.", 401);
     return { merchant };
   }
+  const want = auth === "secret" ? "merchant" : auth;
   const [prefix, role, address] = token.split(".");
-  if (prefix !== "mock" || role !== auth || !address) throw new MockError("unauthorized", "Your session has expired. Sign in again.", 401);
-  if (auth === "merchant") {
+  if (prefix !== "mock" || role !== want || !address) throw new MockError("unauthorized", "Your session has expired. Sign in again.", 401);
+  if (want === "merchant") {
     if (address === "demo") return { merchant: state.merchants.find((m) => m.id === SEEDED.merchantId)!, address: SEEDED.payoutAddress };
     const merchant = state.merchants.find((m) => m.payoutAddress.toLowerCase() === address.toLowerCase());
     return { merchant, address: address as Address };
@@ -33,7 +37,7 @@ function resolveCaller(state: MockState, auth: EndpointDef["auth"], token: strin
   return { address: address as Address };
 }
 
-function zodMessage(err: z.ZodError): string {
+function zodMessage(err: { issues: { path: PropertyKey[]; message: string }[] }): string {
   const issue = err.issues[0];
   return issue ? `${issue.path.join(".") || "body"}: ${issue.message}` : "Invalid request";
 }
@@ -49,40 +53,44 @@ export function createApp(state: MockState) {
   });
 
   // Every endpoint from the shared map, with the same validation the real API will do.
-  for (const [key, def] of Object.entries(endpoints) as [EndpointKey, EndpointDef][]) {
+  for (const [key, def] of Object.entries(Endpoints) as [EndpointName, EndpointDef][]) {
     app.on(def.method, def.path, async (c) => {
       const caller = resolveCaller(state, def.auth, bearer(c));
 
+      if (def.params) {
+        const parsed = def.params.safeParse(c.req.param());
+        if (!parsed.success) throw new MockError("validation_failed", zodMessage(parsed.error), 400);
+      }
       let query: unknown;
       if (def.query) {
         const parsed = def.query.safeParse(c.req.query());
-        if (!parsed.success) throw new MockError("bad_request", zodMessage(parsed.error), 400);
+        if (!parsed.success) throw new MockError("validation_failed", zodMessage(parsed.error), 400);
         query = parsed.data;
       }
       let body: unknown;
       if (def.body) {
         const raw = await c.req.json().catch(() => ({}));
         const parsed = def.body.safeParse(raw);
-        if (!parsed.success) throw new MockError("bad_request", zodMessage(parsed.error), 400);
+        if (!parsed.success) throw new MockError("validation_failed", zodMessage(parsed.error), 400);
         body = parsed.data;
       }
 
       const handler = handlers[key] as (ctx: unknown) => unknown;
       const result = await handler({ c, state, params: c.req.param(), body, query, caller });
 
+      if (def.response === "csv") {
+        return c.body(result as string, 200, {
+          "content-type": "text/csv; charset=utf-8",
+          "content-disposition": 'attachment; filename="payments.csv"',
+        });
+      }
       // Catch drift between the mock and the shared contract immediately.
       const checked = def.response.safeParse(result);
       if (!checked.success) {
         console.error(`[mock] ${key} returned data that doesn't match the shared schema`, checked.error.issues);
         throw new MockError("internal_error", `Mock response for ${key} failed schema validation`, 500);
       }
-      if (def.responseType === "csv") {
-        return c.body(checked.data as string, 200, {
-          "content-type": "text/csv; charset=utf-8",
-          "content-disposition": 'attachment; filename="payments.csv"',
-        });
-      }
-      return c.json(checked.data, 200);
+      return c.json(checked.data, (def.status ?? 200) as 200);
     });
   }
 

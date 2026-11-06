@@ -1,11 +1,4 @@
-import {
-  ApiErrorBody,
-  endpoints,
-  type BodyOf,
-  type EndpointKey,
-  type QueryOf,
-  type ResponseOf,
-} from "@quietpay/shared";
+import { Endpoints, ErrorEnvelope, type BodyOf, type EndpointDef, type EndpointName, type QueryOf, type ResponseOf } from "@quietpay/shared";
 import { env } from "./env";
 
 /** Error from the QuietPay API (or the network), with a message safe to show to people. */
@@ -20,13 +13,13 @@ export class ApiError extends Error {
   }
 }
 
-type CallOptions<K extends EndpointKey> = {
+type CallOptions<N extends EndpointName> = {
   params?: Record<string, string>;
-  /** Merchant or customer JWT, for "merchant" / "customer" endpoints */
+  /** Merchant or customer JWT, for "merchant" / "customer" endpoints (and "secret" ones from the dashboard) */
   token?: string;
   signal?: AbortSignal;
-} & ([BodyOf<K>] extends [never] ? { body?: undefined } : { body: BodyOf<K> }) &
-  ([QueryOf<K>] extends [never] ? { query?: undefined } : { query?: QueryOf<K> });
+} & ([BodyOf<N>] extends [never] ? { body?: undefined } : { body: BodyOf<N> }) &
+  ([QueryOf<N>] extends [never] ? { query?: undefined } : { query?: QueryOf<N> });
 
 function buildPath(path: string, params: Record<string, string> = {}): string {
   return path.replace(/:([A-Za-z]+)/g, (_, name: string) => {
@@ -40,8 +33,8 @@ function buildPath(path: string, params: Record<string, string> = {}): string {
  * Typed call to a QuietPay endpoint. Request bodies and responses are validated with the shared
  * zod schemas, so a mismatch between frontend and API fails loudly instead of rendering bad data.
  */
-export async function api<K extends EndpointKey>(key: K, options: CallOptions<K>): Promise<ResponseOf<K>> {
-  const def = endpoints[key];
+export async function api<N extends EndpointName>(name: N, options: CallOptions<N>): Promise<ResponseOf<N>> {
+  const def = Endpoints[name] as EndpointDef;
   const url = new URL(buildPath(def.path, options.params), env.apiUrl);
   if (options.query) {
     for (const [k, v] of Object.entries(options.query as Record<string, unknown>)) {
@@ -49,10 +42,7 @@ export async function api<K extends EndpointKey>(key: K, options: CallOptions<K>
     }
   }
 
-  let body: string | undefined;
-  if ("body" in def && def.body) {
-    body = JSON.stringify(def.body.parse(options.body ?? {}));
-  }
+  const body = def.body ? JSON.stringify(def.body.parse(options.body ?? {})) : undefined;
 
   let res: Response;
   try {
@@ -71,19 +61,18 @@ export async function api<K extends EndpointKey>(key: K, options: CallOptions<K>
     throw new ApiError("network_error", "Can't reach QuietPay right now. Check your connection and try again.", 0);
   }
 
-  const isCsv = "responseType" in def && def.responseType === "csv";
-  const payload: unknown = isCsv ? await res.text() : await res.json().catch(() => null);
-
   if (!res.ok) {
-    const parsed = ApiErrorBody.safeParse(payload);
+    const parsed = ErrorEnvelope.safeParse(await res.json().catch(() => null));
     if (parsed.success) throw new ApiError(parsed.data.error.code, parsed.data.error.message, res.status);
     throw new ApiError("internal_error", "Something went wrong on our side. Please try again.", res.status);
   }
 
-  const parsed = def.response.safeParse(payload);
+  if (def.response === "csv") return (await res.text()) as ResponseOf<N>;
+
+  const parsed = def.response.safeParse(await res.json().catch(() => null));
   if (!parsed.success) {
-    console.error(`[api] ${key}: response did not match the shared schema`, parsed.error.issues);
+    console.error(`[api] ${name}: response did not match the shared schema`, parsed.error.issues);
     throw new ApiError("bad_response", "QuietPay sent an unexpected response. Please try again.", res.status);
   }
-  return parsed.data as ResponseOf<K>;
+  return parsed.data as ResponseOf<N>;
 }

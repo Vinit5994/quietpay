@@ -1,6 +1,6 @@
 import QRCode from "qrcode";
-import { fromUnits, multiplyAmount, toUnits, type LineItem } from "@quietpay/shared";
-import { randomHash, SEEDED, type MockConfig, type MockState, type SessionRec } from "./state";
+import { fromUnits, toUnits, type LineItem } from "@quietpay/shared";
+import { newPaymentIds, randomHash, SEEDED, type MockConfig, type MockState, type SessionRec } from "./state";
 
 const hours = (n: number) => n * 3_600_000;
 const minutesAgo = (n: number) => new Date(Date.now() - n * 60_000);
@@ -9,7 +9,7 @@ export const lineItem = (name: string, unitAmount: string, quantity = 1): LineIt
   name,
   unitAmount: fromUnits(toUnits(unitAmount)),
   quantity,
-  amount: multiplyAmount(unitAmount, quantity),
+  amount: fromUnits(toUnits(unitAmount) * BigInt(quantity)),
 });
 
 export function qrSvg(url: string): Promise<string> {
@@ -37,15 +37,15 @@ export async function createState(config: MockConfig): Promise<MockState> {
     deliveries: [],
     balances: new Map(),
     permitNonces: new Map(),
-    authNonces: new Map(),
     demoFundedAt: new Map(),
-    counters: { merchant: 1n, plan: 1n, sub: 1n },
+    counters: { merchant: 1n, plan: 1n, sub: 1n, block: 1_000_000n },
   };
 
   state.merchants.push({
     id: SEEDED.merchantId,
     name: "Swag Counter",
     payoutAddress: SEEDED.payoutAddress,
+    signerAddress: SEEDED.signerAddress,
     onchainId: 1n,
     webhookUrl: config.webhookUrl,
     webhookSecret: SEEDED.webhookSecret,
@@ -69,7 +69,6 @@ export async function createState(config: MockConfig): Promise<MockState> {
     createdAt: minutesAgo(590),
   });
 
-  const stickerUrl = `${config.webUrl}/l/${SEEDED.linkSlug}`;
   state.links.push({
     id: "link_sticker_pack",
     merchantId: SEEDED.merchantId,
@@ -78,9 +77,13 @@ export async function createState(config: MockConfig): Promise<MockState> {
     description: "Ten holographic hackathon stickers",
     amount: toUnits("3.00"),
     active: true,
-    qrSvg: await qrSvg(stickerUrl),
+    qrSvg: await qrSvg(`${config.webUrl}/l/${SEEDED.linkSlug}`),
     createdAt: minutesAgo(580),
   });
+
+  const paid = newPaymentIds();
+  const refundedPayment = newPaymentIds();
+  const paidTx = randomHash();
 
   const session = (s: Partial<SessionRec> & Pick<SessionRec, "id" | "mode" | "lineItems" | "amount" | "reference">): SessionRec => ({
     merchantId: SEEDED.merchantId,
@@ -90,6 +93,7 @@ export async function createState(config: MockConfig): Promise<MockState> {
     successUrl: "http://localhost:3000/orders/demo",
     cancelUrl: "http://localhost:3000/cart",
     expiresAt: new Date(t0.getTime() + hours(24)),
+    paymentLinkId: null,
     paymentId: null,
     subscriptionId: null,
     txHash: null,
@@ -98,14 +102,18 @@ export async function createState(config: MockConfig): Promise<MockState> {
     ...s,
   });
 
-  const cart = [lineItem("Builder Hoodie (L)", "25.00"), lineItem("Ship-It Tee", "12.00")];
-  const box = [lineItem("Builder Box", "15.00")];
   for (const s of [
-    session({ id: "sess_demo_payment", mode: "payment", lineItems: cart, amount: toUnits("37.00"), reference: "order_demo_1001" }),
+    session({
+      id: "sess_demo_payment",
+      mode: "payment",
+      lineItems: [lineItem("Builder Hoodie (L)", "25.00"), lineItem("Ship-It Tee", "12.00")],
+      amount: toUnits("37.00"),
+      reference: "order_demo_1001",
+    }),
     session({
       id: "sess_demo_subscription",
       mode: "subscription",
-      lineItems: box,
+      lineItems: [lineItem("Builder Box", "15.00")],
       amount: toUnits("15.00"),
       planId: SEEDED.planId,
       reference: "box_demo_1",
@@ -128,8 +136,8 @@ export async function createState(config: MockConfig): Promise<MockState> {
       reference: "order_demo_0998",
       status: "complete",
       payer: SEEDED.customer,
-      txHash: randomHash(),
-      paymentId: "pay_demo_0998",
+      txHash: paidTx,
+      paymentId: paid.id,
     }),
   ]) {
     state.sessions.set(s.id, s);
@@ -138,39 +146,39 @@ export async function createState(config: MockConfig): Promise<MockState> {
   // A little history so dashboard pages (B8) have something to show.
   state.payments.push(
     {
-      id: "pay_demo_0998",
-      onchainId: randomHash(),
+      ...paid,
       merchantId: SEEDED.merchantId,
       kind: "checkout",
       reference: "order_demo_0998",
+      customerEmail: null,
       payer: SEEDED.customer,
       amount: toUnits("6.00"),
       fee: 0n,
       refunded: 0n,
       refundCount: 0,
-      txHash: state.sessions.get("sess_demo_paid")!.txHash!,
+      txHash: paidTx,
+      blockNumber: 999_990n,
       sessionId: "sess_demo_paid",
       subscriptionId: null,
-      description: "Sticker Pack ×2",
       lineItems: [lineItem("Sticker Pack", "3.00", 2)],
       planName: null,
       paidAt: minutesAgo(40),
     },
     {
-      id: "pay_demo_0997",
-      onchainId: randomHash(),
+      ...refundedPayment,
       merchantId: SEEDED.merchantId,
       kind: "checkout",
       reference: "order_demo_0997",
+      customerEmail: null,
       payer: SEEDED.customer,
       amount: toUnits("25.00"),
       fee: 0n,
       refunded: toUnits("8.00"),
       refundCount: 1,
       txHash: randomHash(),
+      blockNumber: 999_950n,
       sessionId: null,
       subscriptionId: null,
-      description: "Builder Hoodie (M)",
       lineItems: [lineItem("Builder Hoodie (M)", "25.00")],
       planName: null,
       paidAt: minutesAgo(120),
@@ -178,15 +186,21 @@ export async function createState(config: MockConfig): Promise<MockState> {
   );
   state.refunds.push({
     id: "re_demo_1",
-    paymentId: "pay_demo_0997",
+    paymentId: refundedPayment.id,
     merchantId: SEEDED.merchantId,
     amount: toUnits("8.00"),
     reason: "Wrong size, exchanged",
     status: "succeeded",
+    seq: 0,
     txHash: randomHash(),
     error: null,
     createdAt: minutesAgo(100),
   });
 
   return state;
+}
+
+/** API id of the seeded partially-refunded hoodie payment (25.00, 8.00 refunded). */
+export function seededRefundedPaymentId(state: MockState): string {
+  return state.refunds.find((r) => r.id === "re_demo_1")!.paymentId;
 }

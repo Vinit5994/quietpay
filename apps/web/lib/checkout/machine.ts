@@ -1,4 +1,5 @@
-import type { PrepareResponse, PublicSession, SessionStatusResponse, TypedDataPayload } from "@quietpay/shared";
+import type { PrepareSessionResponse, PublicSession, SessionStatusResponse } from "@quietpay/shared";
+import type { TypedDataJson } from "@/lib/wallet/typed-data";
 
 /**
  * Hosted checkout as a pure state machine (docs/SPEC_FRONTEND.md "/c/[sessionId]", 8 states):
@@ -12,7 +13,7 @@ export type Busy = "preparing" | "signing" | "submitting";
 export interface SignStep {
   key: "payment" | "subscribe" | "permit";
   label: string;
-  payload: TypedDataPayload;
+  payload: TypedDataJson;
 }
 
 export type Phase =
@@ -36,7 +37,7 @@ export type Action =
   | { type: "signed_in" }
   | { type: "signed_out" }
   | { type: "pay_started" }
-  | { type: "prepared"; prepare: PrepareResponse }
+  | { type: "prepared"; prepare: PrepareSessionResponse }
   | { type: "sign_step"; current: number; total: number; label: string }
   | { type: "sign_rejected" }
   | { type: "submit_started" }
@@ -64,13 +65,13 @@ export const MESSAGES = {
 };
 
 /** The messages the customer signs, in order. */
-export function signSteps(prepare: PrepareResponse): SignStep[] {
+export function signSteps(prepare: PrepareSessionResponse): SignStep[] {
   if (prepare.mode === "payment") {
-    return [{ key: "payment", label: `Confirm payment of ${prepare.amount} USDT`, payload: prepare.toSign.payment }];
+    return [{ key: "payment", label: `Confirm payment of ${prepare.amount} USDT`, payload: prepare.typedData.payment }];
   }
   return [
-    { key: "subscribe", label: "Approve the subscription", payload: prepare.toSign.subscribe },
-    { key: "permit", label: `Allow charges up to ${prepare.spendingCap} USDT in total`, payload: prepare.toSign.permit },
+    { key: "subscribe", label: "Approve the subscription", payload: prepare.typedData.subscribe },
+    { key: "permit", label: `Allow charges up to ${prepare.spendingCap} USDT in total`, payload: prepare.typedData.permit },
   ];
 }
 
@@ -119,7 +120,7 @@ export function reducer(phase: Phase, action: Action): Phase {
     case "prepared": {
       if (phase.name !== "pay") return phase;
       const p = action.prepare;
-      if (!p.sufficientFunds) return { name: "insufficient", session: phase.session, balance: p.balance, needed: p.amount };
+      if (!p.sufficientBalance) return { name: "insufficient", session: phase.session, balance: p.balance, needed: p.amount };
       const steps = signSteps(p);
       return { ...phase, busy: "signing", step: { current: 1, total: steps.length, label: steps[0]!.label } };
     }
@@ -145,7 +146,9 @@ export function reducer(phase: Phase, action: Action): Phase {
       const s = action.status;
       if (s.status === "complete") return { name: "success", session: phase.session, status: s };
       if (s.status === "expired") return { name: "closed", session: phase.session, reason: "expired", message: MESSAGES.expired };
-      if (s.status === "open") return payIdle(phase.session, "The payment didn't go through. You haven't been charged. Please try again.");
+      if (s.status === "open") {
+        return payIdle(phase.session, s.error?.message ?? "The payment didn't go through. You haven't been charged. Please try again.");
+      }
       return { ...phase, txHash: s.txHash ?? phase.txHash };
     }
 

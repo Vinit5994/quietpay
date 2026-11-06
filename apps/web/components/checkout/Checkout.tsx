@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { explorerTx, formatUsdt, multiplyAmount, type PublicSession } from "@quietpay/shared";
+import { explorerTx, formatUsdt as formatUsdtBase, type PublicSession } from "@quietpay/shared";
 import { env } from "@/lib/env";
-import { shortAddress } from "@/lib/format";
+import { intervalLabel, shortAddress } from "@/lib/format";
 import type { Phase } from "@/lib/checkout/machine";
 import { useCheckout } from "@/lib/checkout/useCheckout";
 import type { Wallet } from "@/lib/wallet";
 
-const SUBSCRIPTION_PERIODS_IN_CAP = 12;
+/** "1234.5" → "1,234.50 USDT" */
+const formatUsdt = (amount: string) => formatUsdtBase(amount).replace(/\B(?=(\d{3})+(?!\d))(?=[\d,]*\.)/g, ",");
 
 export function Checkout({ sessionId }: { sessionId: string }) {
   const { phase, wallet, pay } = useCheckout(sessionId);
@@ -88,21 +89,21 @@ function Body({ phase, wallet, pay }: { phase: Phase; wallet: Wallet; pay: () =>
 function Summary({ session }: { session: PublicSession }) {
   if (session.mode === "subscription" && session.plan) {
     const plan = session.plan;
-    const cap = multiplyAmount(plan.amount, SUBSCRIPTION_PERIODS_IN_CAP);
+    const every = intervalLabel(plan.periodSeconds);
     return (
       <div>
         <p className="text-sm text-[var(--color-muted)]">Subscription</p>
         <p className="mt-0.5 text-lg font-semibold">{plan.name}</p>
         <p className="tabular mt-3 text-3xl font-semibold">
-          {formatUsdt(plan.amount)} <span className="text-base font-normal text-[var(--color-muted)]">{plan.intervalLabel}</span>
+          {formatUsdt(plan.amount)} <span className="text-base font-normal text-[var(--color-muted)]">{every}</span>
         </p>
         <ul className="mt-4 space-y-1.5 text-sm">
-          <li>First charge today, then {plan.intervalLabel}.</li>
+          <li>First charge today, then {every}.</li>
           <li>Cancel anytime.</li>
         </ul>
         <p className="mt-4 rounded-lg bg-[var(--color-bg)] p-3 text-sm text-[var(--color-muted)]">
-          You allow {session.merchant.name} to charge up to <span className="tabular font-medium text-[var(--color-ink)]">{formatUsdt(cap)}</span> over{" "}
-          {SUBSCRIPTION_PERIODS_IN_CAP} periods. You're only charged {formatUsdt(plan.amount)} each period.
+          You allow {session.merchant.name} to charge up to <span className="tabular font-medium text-[var(--color-ink)]">{formatUsdt(plan.spendingCap)}</span> over{" "}
+          {plan.capPeriods} periods. You're only charged {formatUsdt(plan.amount)} each period.
         </p>
       </div>
     );

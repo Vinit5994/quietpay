@@ -1,18 +1,28 @@
-import { createHmac } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { endpoints, toSignableTypedData, WebhookEvent, type PrepareResponse } from "@quietpay/shared";
+import { verifyWebhook } from "@quietpay/node";
+import { Endpoints, type PrepareSessionResponse } from "@quietpay/shared";
 import { createApp } from "./app";
 import { chargeSubscription } from "./engine";
 import { handlers } from "./handlers";
-import { createState } from "./seed";
+import { createState, seededRefundedPaymentId } from "./seed";
 import { SEEDED, setBalance, type MockState } from "./state";
 
 const SK = { authorization: `Bearer ${SEEDED.secretKey}`, "content-type": "application/json" };
 const JSON_HEADERS = { "content-type": "application/json" };
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const WRONG_SIGNATURE = `0x${"ab".repeat(65)}`;
+
+/** JSON typed data (uint strings) → viem shape (bigint), like apps/web's toSignable. */
+function signable(td: { types: Record<string, { name: string; type: string }[]>; primaryType: string; message: Record<string, unknown> }) {
+  const fields = td.types[td.primaryType] ?? [];
+  const message = Object.fromEntries(
+    Object.entries(td.message).map(([k, v]) => [k, /^u?int/.test(fields.find((f) => f.name === k)?.type ?? "") ? BigInt(v as string) : v]),
+  );
+  return { ...td, message };
+}
 
 let server: Server;
 let webhookUrl = "";
@@ -46,7 +56,7 @@ async function setup(): Promise<{ state: MockState; app: ReturnType<typeof creat
 
 describe("mock API", () => {
   it("implements a handler for every endpoint in the shared map", () => {
-    expect(Object.keys(handlers).sort()).toEqual(Object.keys(endpoints).sort());
+    expect(Object.keys(handlers).sort()).toEqual(Object.keys(Endpoints).sort());
   });
 
   it("rejects merchant calls without a valid secret key", async () => {
@@ -60,7 +70,7 @@ describe("mock API", () => {
     const { app } = await setup();
     const res = await app.request("/v1/checkout/sessions", { method: "POST", headers: SK, body: JSON.stringify({ mode: "payment", lineItems: [] }) });
     expect(res.status).toBe(400);
-    expect((await res.json()).error.code).toBe("bad_request");
+    expect((await res.json()).error.code).toBe("validation_failed");
   });
 
   it("runs a payment end to end: create, prepare, sign, submit, complete, signed webhook", async () => {
@@ -77,35 +87,36 @@ describe("mock API", () => {
         cancelUrl: "http://localhost:3000/cart",
       }),
     });
-    expect(create.status).toBe(200);
+    expect(create.status).toBe(201);
     const session = await create.json();
     expect(session.amount).toBe("49.00");
 
     const account = privateKeyToAccount(generatePrivateKey());
-    const prep = (await (await app.request(`/public/sessions/${session.id}/prepare`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ payer: account.address }) })).json()) as PrepareResponse;
+    const prep = (await (await app.request(`/public/sessions/${session.id}/prepare`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ payer: account.address }) })).json()) as PrepareSessionResponse;
     expect(prep.mode).toBe("payment");
     if (prep.mode !== "payment") return;
-    expect(prep.toSign.payment.message.value).toBe("49000000");
+    expect(prep.typedData.payment.message.value).toBe("49000000");
 
-    const signature = await account.signTypedData(toSignableTypedData(prep.toSign.payment) as Parameters<typeof account.signTypedData>[0]);
+    const signature = await account.signTypedData(signable(prep.typedData.payment) as unknown as Parameters<typeof account.signTypedData>[0]);
     const submit = await app.request(`/public/sessions/${session.id}/submit`, { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ payer: account.address, signatures: { payment: signature } }) });
-    expect(submit.status).toBe(200);
+    expect(submit.status).toBe(202);
 
     await wait(120);
     const status = await (await app.request(`/public/sessions/${session.id}/status`)).json();
     expect(status.status).toBe("complete");
     expect(status.redirectUrl).toBe("http://localhost:3000/orders/42");
 
+    // Verified with the SDK the store uses, so mock webhooks are guaranteed to be accepted.
     const paymentHook = received.find((r) => JSON.parse(r.body).type === "payment.succeeded")!;
-    expect(WebhookEvent.parse(JSON.parse(paymentHook.body)).type).toBe("payment.succeeded");
-    const [t, v1] = paymentHook.signature.split(",").map((p) => p.split("=")[1]);
-    expect(v1).toBe(createHmac("sha256", SEEDED.webhookSecret).update(`${t}.${paymentHook.body}`).digest("hex"));
+    const event = verifyWebhook(paymentHook.body, paymentHook.signature, SEEDED.webhookSecret);
+    expect(event.type).toBe("payment.succeeded");
+    if (event.type === "payment.succeeded") expect(event.data.merchantReference).toBe("order_42");
   });
 
   it("rejects a bad signature when strict, and an already-paid session", async () => {
     const { app } = await setup();
     const account = privateKeyToAccount(generatePrivateKey());
-    const bad = await app.request("/public/sessions/sess_demo_payment/submit", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ payer: account.address, signatures: { payment: "0x1234" } }) });
+    const bad = await app.request("/public/sessions/sess_demo_payment/submit", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ payer: account.address, signatures: { payment: WRONG_SIGNATURE } }) });
     expect((await bad.json()).error.code).toBe("invalid_signature");
     const paid = await app.request("/public/sessions/sess_demo_paid/prepare", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ payer: account.address }) });
     expect((await paid.json()).error.code).toBe("session_not_open");
@@ -118,17 +129,24 @@ describe("mock API", () => {
     const account = privateKeyToAccount(generatePrivateKey());
     setBalance(state, account.address, 4_000_000n);
     const prep = await (await app.request("/public/sessions/sess_demo_payment/prepare", { method: "POST", headers: JSON_HEADERS, body: JSON.stringify({ payer: account.address }) })).json();
-    expect(prep.sufficientFunds).toBe(false);
+    expect(prep.sufficientBalance).toBe(false);
     expect(prep.balance).toBe("4.00");
   });
 
   it("caps refunds at the amount paid", async () => {
-    const { app } = await setup();
+    const { state, app } = await setup();
+    // The dashboard calls /v1 with its merchant token.
     const auth = { authorization: "Bearer mock.merchant.demo", "content-type": "application/json" };
-    const tooMuch = await app.request("/dash/refunds", { method: "POST", headers: auth, body: JSON.stringify({ paymentId: "pay_demo_0997", amount: "20.00" }) });
+    const paymentId = seededRefundedPaymentId(state);
+    const tooMuch = await app.request("/v1/refunds", { method: "POST", headers: auth, body: JSON.stringify({ paymentId, amount: "20.00" }) });
     expect((await tooMuch.json()).error.code).toBe("refund_exceeds_payment");
-    const ok = await app.request("/dash/refunds", { method: "POST", headers: auth, body: JSON.stringify({ paymentId: "pay_demo_0997", amount: "17.00" }) });
-    expect((await ok.json()).status).toBe("awaiting_signature");
+    const ok = await app.request("/v1/refunds", { method: "POST", headers: auth, body: JSON.stringify({ paymentId, amount: "17.00" }) });
+    expect(ok.status).toBe(201);
+    const refund = await ok.json();
+    expect(refund.status).toBe("awaiting_signature");
+    const td = await (await app.request(`/dash/refunds/${refund.id}/typed-data`, { method: "POST", headers: auth })).json();
+    expect(td.refund.seq).toBe(1);
+    expect(td.typedData.message.value).toBe("17000000");
   });
 
   it("subscription goes past due on failure and is canceled after grace", async () => {

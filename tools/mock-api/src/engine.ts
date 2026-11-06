@@ -1,8 +1,8 @@
 import { explorerTx, fromUnits } from "@quietpay/shared";
 import {
-  describeLineItems,
   getBalance,
-  newId,
+  newPaymentIds,
+  nextBlock,
   randomHash,
   recordGas,
   setBalance,
@@ -15,45 +15,72 @@ import {
 import { emitWebhook } from "./webhooks";
 
 const later = (ms: number, fn: () => void) => setTimeout(fn, ms).unref?.();
+const chain = (txHash: string | null) => ({ txHash, explorerUrl: txHash ? explorerTx(txHash) : null });
 
-export function subscriptionEventData(state: MockState, sub: SubRec, txHash: string | null) {
+export function subscriptionEventData(
+  state: MockState,
+  sub: SubRec,
+  txHash: string | null,
+  extra: { paymentId?: string | null; attemptedCycle?: number | null } = {},
+) {
   const plan = state.plans.find((p) => p.id === sub.planId)!;
   return {
-    subscriptionId: sub.id,
     merchantReference: sub.reference,
+    ...chain(txHash),
+    subscriptionId: sub.id,
     planId: sub.planId,
+    subscriberAddress: sub.subscriber,
     status: sub.status,
     cycle: sub.cycle,
     amount: fromUnits(plan.amount),
     nextChargeAt: sub.nextChargeAt?.toISOString() ?? null,
+    pastDueSince: sub.pastDueSince?.toISOString() ?? null,
     cancelReason: sub.cancelReason,
-    txHash,
-    explorerUrl: txHash ? explorerTx(txHash) : null,
+    paymentId: extra.paymentId ?? null,
+    attemptedCycle: extra.attemptedCycle ?? null,
   };
 }
 
 function paymentEventData(p: PaymentRec) {
   return {
-    paymentId: p.id,
     merchantReference: p.reference,
+    ...chain(p.txHash),
+    paymentId: p.id,
     kind: p.kind,
-    amount: fromUnits(p.amount),
-    payer: p.payer,
     sessionId: p.sessionId,
     subscriptionId: p.subscriptionId,
-    txHash: p.txHash,
-    explorerUrl: explorerTx(p.txHash),
+    payerAddress: p.payer,
+    amount: fromUnits(p.amount),
+    fee: fromUnits(p.fee),
+    net: fromUnits(p.amount - p.fee),
+    paidAt: p.paidAt.toISOString(),
   };
 }
 
-function createPayment(state: MockState, input: Omit<PaymentRec, "id" | "onchainId" | "refunded" | "refundCount" | "fee" | "paidAt">): PaymentRec {
+function sessionCompletedData(session: SessionRec, payment: PaymentRec) {
+  return {
+    merchantReference: session.reference,
+    ...chain(session.txHash),
+    sessionId: session.id,
+    mode: session.mode,
+    paymentId: payment.id,
+    subscriptionId: session.subscriptionId,
+    payerAddress: session.payer!,
+    amount: fromUnits(session.amount),
+  };
+}
+
+function createPayment(
+  state: MockState,
+  input: Omit<PaymentRec, "id" | "onchainId" | "refunded" | "refundCount" | "fee" | "paidAt" | "blockNumber">,
+): PaymentRec {
   const payment: PaymentRec = {
     ...input,
-    id: newId("pay"),
-    onchainId: randomHash(),
+    ...newPaymentIds(),
     fee: 0n,
     refunded: 0n,
     refundCount: 0,
+    blockNumber: nextBlock(state),
     paidAt: new Date(),
   };
   state.payments.unshift(payment);
@@ -76,27 +103,18 @@ async function confirmSession(state: MockState, session: SessionRec) {
       merchantId: session.merchantId,
       kind: "checkout",
       reference: session.reference,
+      customerEmail: session.customerEmail,
       payer,
       amount: session.amount,
       txHash,
       sessionId: session.id,
       subscriptionId: null,
-      description: describeLineItems(session.lineItems),
       lineItems: session.lineItems,
       planName: null,
     });
     session.paymentId = payment.id;
     session.status = "complete";
-    await emitWebhook(state, session.merchantId, "checkout.session.completed", {
-      sessionId: session.id,
-      merchantReference: session.reference,
-      mode: session.mode,
-      amount: fromUnits(session.amount),
-      paymentId: payment.id,
-      subscriptionId: null,
-      txHash,
-      explorerUrl: explorerTx(txHash),
-    });
+    await emitWebhook(state, session.merchantId, "checkout.session.completed", sessionCompletedData(session, payment));
     await emitWebhook(state, session.merchantId, "payment.succeeded", paymentEventData(payment));
     return;
   }
@@ -104,7 +122,7 @@ async function confirmSession(state: MockState, session: SessionRec) {
   const plan = state.plans.find((p) => p.id === session.planId)!;
   state.counters.sub += 1n;
   const sub: SubRec = {
-    id: newId("sub"),
+    id: `sub_${randomHash().slice(2, 18)}`,
     onchainId: state.counters.sub,
     merchantId: session.merchantId,
     planId: plan.id,
@@ -126,30 +144,21 @@ async function confirmSession(state: MockState, session: SessionRec) {
     merchantId: session.merchantId,
     kind: "subscription",
     reference: session.reference,
+    customerEmail: session.customerEmail,
     payer,
     amount: plan.amount,
     txHash,
     sessionId: session.id,
     subscriptionId: sub.id,
-    description: `${plan.name}, period 1`,
     lineItems: [{ name: plan.name, unitAmount: fromUnits(plan.amount), quantity: 1, amount: fromUnits(plan.amount) }],
     planName: plan.name,
   });
   session.paymentId = payment.id;
   session.subscriptionId = sub.id;
   session.status = "complete";
-  await emitWebhook(state, session.merchantId, "subscription.created", subscriptionEventData(state, sub, txHash));
+  await emitWebhook(state, session.merchantId, "subscription.created", subscriptionEventData(state, sub, txHash, { paymentId: payment.id }));
   await emitWebhook(state, session.merchantId, "payment.succeeded", paymentEventData(payment));
-  await emitWebhook(state, session.merchantId, "checkout.session.completed", {
-    sessionId: session.id,
-    merchantReference: session.reference,
-    mode: session.mode,
-    amount: fromUnits(session.amount),
-    paymentId: payment.id,
-    subscriptionId: sub.id,
-    txHash,
-    explorerUrl: explorerTx(txHash),
-  });
+  await emitWebhook(state, session.merchantId, "checkout.session.completed", sessionCompletedData(session, payment));
 }
 
 /** Keeper: renew due subscriptions, retry past-due ones, cancel after grace. Runs every second. */
@@ -181,16 +190,16 @@ export async function chargeSubscription(state: MockState, sub: SubRec, at = new
       merchantId: sub.merchantId,
       kind: "subscription",
       reference: sub.reference,
+      customerEmail: sub.customerEmail,
       payer: sub.subscriber,
       amount: plan.amount,
       txHash,
       sessionId: null,
       subscriptionId: sub.id,
-      description: `${plan.name}, period ${sub.cycle + 1}`,
       lineItems: [{ name: plan.name, unitAmount: fromUnits(plan.amount), quantity: 1, amount: fromUnits(plan.amount) }],
       planName: plan.name,
     });
-    await emitWebhook(state, sub.merchantId, "subscription.renewed", subscriptionEventData(state, sub, txHash));
+    await emitWebhook(state, sub.merchantId, "subscription.renewed", subscriptionEventData(state, sub, txHash, { paymentId: payment.id }));
     await emitWebhook(state, sub.merchantId, "payment.succeeded", paymentEventData(payment));
     return;
   }
@@ -206,15 +215,17 @@ export async function chargeSubscription(state: MockState, sub: SubRec, at = new
     await emitWebhook(state, sub.merchantId, "subscription.canceled", subscriptionEventData(state, sub, txHash));
     return;
   }
-  await emitWebhook(state, sub.merchantId, "subscription.payment_failed", subscriptionEventData(state, sub, txHash));
+  await emitWebhook(state, sub.merchantId, "subscription.payment_failed", subscriptionEventData(state, sub, txHash, { attemptedCycle: sub.cycle + 1 }));
 }
 
 export async function cancelSubscription(state: MockState, sub: SubRec, reason: "customer" | "merchant") {
   recordGas(state, sub.merchantId);
+  const txHash = randomHash();
   sub.status = "canceled";
   sub.cancelReason = reason;
   sub.nextChargeAt = null;
-  await emitWebhook(state, sub.merchantId, "subscription.canceled", subscriptionEventData(state, sub, randomHash()));
+  await emitWebhook(state, sub.merchantId, "subscription.canceled", subscriptionEventData(state, sub, txHash));
+  return txHash;
 }
 
 /** After a refund signature is submitted: confirm after `confirmMs`. */
@@ -235,12 +246,13 @@ async function confirmRefund(state: MockState, refund: RefundRec) {
   setBalance(state, payment.payer, getBalance(state, payment.payer) + refund.amount);
   refund.status = "succeeded";
   await emitWebhook(state, refund.merchantId, "refund.succeeded", {
+    merchantReference: payment.reference,
+    ...chain(refund.txHash),
     refundId: refund.id,
     paymentId: payment.id,
-    merchantReference: payment.reference,
     amount: fromUnits(refund.amount),
     totalRefunded: fromUnits(payment.refunded),
-    txHash: refund.txHash!,
-    explorerUrl: explorerTx(refund.txHash!),
+    paymentAmount: fromUnits(payment.amount),
+    fullyRefunded: payment.refunded >= payment.amount,
   });
 }

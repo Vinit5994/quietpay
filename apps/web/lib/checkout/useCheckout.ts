@@ -25,7 +25,7 @@ export function useCheckout(sessionId: string) {
   useEffect(() => {
     if (!walletReady) return;
     const ctrl = new AbortController();
-    api("getPublicSession", { params: { id: sessionId }, signal: ctrl.signal })
+    api("publicGetSession", { params: { id: sessionId }, signal: ctrl.signal })
       .then((session) => dispatch({ type: "loaded", session, signedIn: wallet.status === "signed_in" }))
       .catch((err) => {
         if ((err as Error).name !== "AbortError") dispatch({ type: "load_failed", ...errorOf(err) });
@@ -56,7 +56,7 @@ export function useCheckout(sessionId: string) {
     if (!processing) return;
     const slow = setTimeout(() => dispatch({ type: "slow" }), SLOW_AFTER_MS);
     const poll = setInterval(() => {
-      api("getSessionStatus", { params: { id: sessionId } })
+      api("publicSessionStatus", { params: { id: sessionId } })
         .then((status) => dispatch({ type: "status", status }))
         .catch(() => {
           /* transient: keep polling */
@@ -74,9 +74,9 @@ export function useCheckout(sessionId: string) {
     const payer = wallet.address;
     try {
       dispatch({ type: "pay_started" });
-      const prepare = await api("prepareSession", { params: { id: sessionId }, body: { payer } });
+      const prepare = await api("publicPrepareSession", { params: { id: sessionId }, body: { payer } });
       dispatch({ type: "prepared", prepare });
-      if (!prepare.sufficientFunds) return;
+      if (!prepare.sufficientBalance) return;
 
       const steps = signSteps(prepare);
       const signatures: Partial<Record<"payment" | "subscribe" | "permit", Hex>> = {};
@@ -94,7 +94,7 @@ export function useCheckout(sessionId: string) {
       }
 
       dispatch({ type: "submit_started" });
-      const { txHash } = await api("submitSession", { params: { id: sessionId }, body: { payer, signatures } });
+      const { txHash } = await api("publicSubmitSession", { params: { id: sessionId }, body: { payer, signatures } });
       dispatch({ type: "submitted", txHash });
     } catch (err) {
       dispatch({ type: "failed", ...errorOf(err) });

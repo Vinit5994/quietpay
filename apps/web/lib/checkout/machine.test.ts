@@ -1,12 +1,29 @@
 import { describe, expect, it } from "vitest";
-import type { PrepareResponse, PublicSession, SessionStatusResponse, TypedDataPayload } from "@quietpay/shared";
+import type { PrepareSessionResponse, PublicSession, SessionStatusResponse } from "@quietpay/shared";
 import { MESSAGES, initialPhase, reducer, signSteps, type Phase } from "./machine";
 
-const td: TypedDataPayload = {
-  domain: { name: "Tether USD", version: "1", chainId: 1874, verifyingContract: "0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7" },
-  types: { X: [{ name: "a", type: "uint256" }] },
-  primaryType: "X",
-  message: { a: "1" },
+const payer = "0x1111111111111111111111111111111111111111";
+const USDT = "0xcedfB56113143d55b2358b8CFbB0dEB5Ad2f55a7";
+const hash = (c: string) => `0x${c.repeat(64)}`;
+const domain = { name: "Tether USD", version: "1", chainId: 1874, verifyingContract: USDT };
+
+const paymentTd = {
+  domain,
+  types: { ReceiveWithAuthorization: [{ name: "value", type: "uint256" }] },
+  primaryType: "ReceiveWithAuthorization" as const,
+  message: { from: payer, to: payer, value: "25000000", validAfter: "0", validBefore: "1900000000", nonce: hash("a") },
+};
+const subscribeTd = {
+  domain,
+  types: { Subscribe: [{ name: "planId", type: "uint256" }] },
+  primaryType: "Subscribe" as const,
+  message: { planId: "1", subscriber: payer, maxAmount: "15000000", nonce: "0", deadline: "1900000000" },
+};
+const permitTd = {
+  domain,
+  types: { Permit: [{ name: "value", type: "uint256" }] },
+  primaryType: "Permit" as const,
+  message: { owner: payer, spender: payer, value: "180000000", nonce: "0", deadline: "1900000000" },
 };
 
 const session = (over: Partial<PublicSession> = {}): PublicSession => ({
@@ -18,41 +35,41 @@ const session = (over: Partial<PublicSession> = {}): PublicSession => ({
   amount: "25.00",
   currency: "USDT",
   plan: null,
-  expiresAt: new Date(Date.now() + 600_000).toISOString(),
   successUrl: "http://localhost:3000/orders/1",
   cancelUrl: "http://localhost:3000/cart",
-  txHash: null,
   paymentId: null,
+  txHash: null,
+  explorerUrl: null,
+  expiresAt: new Date(Date.now() + 600_000).toISOString(),
   ...over,
 });
 
-const payer = "0x1111111111111111111111111111111111111111";
-const preparePayment = (sufficientFunds = true): PrepareResponse => ({
+const preparePayment = (sufficientBalance = true): PrepareSessionResponse => ({
   mode: "payment",
   payer,
   amount: "25.00",
-  balance: sufficientFunds ? "100.00" : "4.00",
-  sufficientFunds,
-  toSign: { payment: td },
+  balance: sufficientBalance ? "100.00" : "4.00",
+  sufficientBalance,
+  typedData: { payment: paymentTd },
 });
-const prepareSub: PrepareResponse = {
+const prepareSub: PrepareSessionResponse = {
   mode: "subscription",
   payer,
   amount: "15.00",
   balance: "100.00",
-  sufficientFunds: true,
+  sufficientBalance: true,
   spendingCap: "180.00",
-  periods: 12,
-  toSign: { subscribe: td, permit: td },
+  typedData: { subscribe: subscribeTd, permit: permitTd },
 };
-const status = (s: SessionStatusResponse["status"]): SessionStatusResponse => ({
+const status = (s: SessionStatusResponse["status"], error: SessionStatusResponse["error"] = null): SessionStatusResponse => ({
   status: s,
-  txHash: "0x" + "a".repeat(64),
+  txHash: hash("a"),
+  explorerUrl: null,
   paymentId: s === "complete" ? "pay_1" : null,
   subscriptionId: null,
   receiptUrl: s === "complete" ? "http://localhost:3001/r/pay_1" : null,
   redirectUrl: s === "complete" ? "http://localhost:3000/orders/1" : null,
-  explorerUrl: null,
+  error,
 });
 
 const run = (actions: Parameters<typeof reducer>[1][], from: Phase = initialPhase) => actions.reduce(reducer, from);
@@ -83,7 +100,7 @@ describe("checkout machine", () => {
       { type: "pay_started" },
       { type: "prepared", prepare: preparePayment() },
       { type: "submit_started" },
-      { type: "submitted", txHash: "0x" + "b".repeat(64) },
+      { type: "submitted", txHash: hash("b") },
       { type: "status", status: status("processing") },
       { type: "status", status: status("complete") },
     ]);
@@ -132,9 +149,9 @@ describe("checkout machine", () => {
       { type: "pay_started" },
       { type: "prepared", prepare: preparePayment() },
       { type: "submit_started" },
-      { type: "submitted", txHash: "0x" + "b".repeat(64) },
-      { type: "status", status: status("open") },
+      { type: "submitted", txHash: hash("b") },
+      { type: "status", status: status("open", { code: "transaction_failed", message: "The payment was reverted." }) },
     ]);
-    expect(p).toMatchObject({ name: "pay", busy: null });
+    expect(p).toMatchObject({ name: "pay", busy: null, notice: "The payment was reverted." });
   });
 });

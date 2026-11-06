@@ -4,6 +4,7 @@ import { DevWalletProvider, useDevWallet } from "./dev-wallet";
 import type { Wallet } from "./types";
 
 export { SignatureRejectedError, type Wallet, type WalletStatus } from "./types";
+export type { TypedDataJson } from "./typed-data";
 
 /** Picks the wallet implementation. Privy (NEXT_PUBLIC_WALLET_MODE=privy) is added in task B4. */
 export function WalletProvider({ children }: { children: React.ReactNode }) {

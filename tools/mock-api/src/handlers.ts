@@ -1,33 +1,39 @@
 import type { Context } from "hono";
 import { verifyTypedData, type Address, type Hex } from "viem";
+import type { z } from "zod";
 import {
+  CancelSubscriptionTypedData,
+  PAYMENTS_CSV_COLUMNS,
+  PermitTypedData,
+  ReceiveWithAuthorizationTypedData,
+  SubscribeTypedData,
+  USDT_ADDRESS,
+  cancelSubscriptionTypedData,
   explorerTx,
   fromUnits,
   orderIdFromSessionId,
   paymentNonce,
-  quietPayDomain,
-  quietPayTypes,
+  permitTypedData,
+  receiveWithAuthorizationTypedData,
   refundNonce,
-  sumAmounts,
-  toSignableTypedData,
-  toTypedDataPayload,
+  subscribeTypedData,
   toUnits,
-  usdtDomain,
-  usdtTypes,
   type BodyOf,
-  type EndpointKey,
-  type QueryOf,
+  type EndpointName,
+  type Endpoints,
   type ResponseOf,
-  type TypedDataPayload,
 } from "@quietpay/shared";
 import { cancelSubscription, scheduleRefundConfirmation, scheduleSessionConfirmation } from "./engine";
 import { lineItem, qrSvg } from "./seed";
 import {
+  CAP_PERIODS,
   GAS_PER_TX_WEI,
   MOCK_QUIETPAY_ADDRESS,
+  MOCK_RELAYER_ADDRESS,
   gasSummary,
   getBalance,
   newId,
+  paymentStatus,
   randomHash,
   refreshSession,
   setBalance,
@@ -40,9 +46,11 @@ import {
   toPublicSession,
   toRefund,
   toSubscription,
+  type LinkRec,
   type MerchantRec,
   type MockState,
   type PlanRec,
+  type RefundRec,
   type SessionRec,
 } from "./state";
 import { emitWebhook } from "./webhooks";
@@ -51,7 +59,7 @@ export class MockError extends Error {
   constructor(
     public code: string,
     message: string,
-    public status: 400 | 401 | 402 | 404 | 409 | 422 | 429 | 500 = 400,
+    public status: 400 | 401 | 402 | 403 | 404 | 409 | 422 | 429 | 500 = 400,
   ) {
     super(message);
   }
@@ -62,28 +70,35 @@ export interface Caller {
   address?: Address;
 }
 
-export interface Ctx<K extends EndpointKey> {
+export interface Ctx<N extends EndpointName> {
   c: Context;
   state: MockState;
   params: Record<string, string>;
-  body: [BodyOf<K>] extends [never] ? undefined : BodyOf<K>;
-  query: [QueryOf<K>] extends [never] ? undefined : QueryOf<K>;
+  body: [BodyOf<N>] extends [never] ? undefined : BodyOf<N>;
+  /** parsed (output) query: app.ts validates it with the shared schema first */
+  query: Endpoints[N] extends { query: infer Q extends z.ZodType } ? z.output<Q> : undefined;
   caller: Caller;
 }
 
-type Handlers = { [K in EndpointKey]: (ctx: Ctx<K>) => ResponseOf<K> | Promise<ResponseOf<K>> };
+type Handlers = { [N in EndpointName]: (ctx: Ctx<N>) => ResponseOf<N> | Promise<ResponseOf<N>> };
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-const PERIODS_IN_CAP = 12;
 const MIN_AMOUNT = toUnits("0.50");
 const lower = (a: string) => a.toLowerCase();
 const unix = (d: Date) => BigInt(Math.floor(d.getTime() / 1000));
 const PERIODS: Record<PlanRec["interval"], number> = { month: 2_592_000, week: 604_800, custom: 0 };
+/** bigint uints → decimal strings, validated (and typed) by the shared typed-data schema. */
+function json<S extends z.ZodType>(schema: S, td: { message: unknown }): z.output<S> {
+  const message = Object.fromEntries(
+    Object.entries(td.message as Record<string, unknown>).map(([k, v]) => [k, typeof v === "bigint" ? v.toString() : v]),
+  );
+  return schema.parse({ ...td, message });
+}
 
 function requireMerchant(caller: Caller): MerchantRec {
   if (!caller.merchant) {
-    throw new MockError("merchant_not_found", "No QuietPay business is linked to this wallet yet. Finish onboarding first.", 404);
+    throw new MockError("not_found", "No QuietPay business is linked to this wallet yet. Finish onboarding first.", 404);
   }
   return caller.merchant;
 }
@@ -99,21 +114,16 @@ function requireOpen(s: SessionRec) {
   if (s.status !== "open") throw new MockError("session_not_open", "This checkout has already been paid.", 409);
 }
 
-function paginate<T>(items: T[], limit = 20, cursor?: string) {
-  const start = cursor ? Number(cursor) : 0;
-  const page = items.slice(start, start + limit);
-  const next = start + limit < items.length ? String(start + limit) : null;
-  return { data: page, nextCursor: next };
+function paginate<T>(items: T[], query?: { limit?: number; cursor?: string }) {
+  const limit = query?.limit ?? 20;
+  const start = query?.cursor ? Number(query.cursor) : 0;
+  return { data: items.slice(start, start + limit), nextCursor: start + limit < items.length ? String(start + limit) : null };
 }
 
-async function warnOrRejectSignature(state: MockState, label: string, payload: TypedDataPayload, signer: Address, signature: Hex) {
+async function checkSignature(state: MockState, label: string, typedData: unknown, signer: Address, signature: Hex) {
   let ok = false;
   try {
-    ok = await verifyTypedData({
-      ...(toSignableTypedData(payload) as Omit<Parameters<typeof verifyTypedData>[0], "address" | "signature">),
-      address: signer,
-      signature,
-    } as Parameters<typeof verifyTypedData>[0]);
+    ok = await verifyTypedData({ ...(typedData as object), address: signer, signature } as unknown as Parameters<typeof verifyTypedData>[0]);
   } catch {
     ok = false;
   }
@@ -122,61 +132,43 @@ async function warnOrRejectSignature(state: MockState, label: string, payload: T
   console.warn(`[mock] ${label}: signature does not verify for ${signer} (accepted because MOCK_STRICT_SIGNATURES=false)`);
 }
 
-function buildPrepare(state: MockState, s: SessionRec, payer: Address) {
+/** Typed data with bigint uints (for verifying) for a session + payer. */
+function typedDataFor(state: MockState, s: SessionRec, payer: Address) {
   const merchant = state.merchants.find((m) => m.id === s.merchantId)!;
-  const balance = getBalance(state, payer);
-  const base = { payer, amount: fromUnits(s.amount), balance: fromUnits(balance), sufficientFunds: balance >= s.amount };
   const deadline = unix(new Date(Date.now() + 30 * 60_000));
-
   if (s.mode === "payment") {
-    const payment = toTypedDataPayload({
-      domain: usdtDomain(),
-      types: { ReceiveWithAuthorization: usdtTypes.ReceiveWithAuthorization },
-      primaryType: "ReceiveWithAuthorization",
-      message: {
+    return {
+      payment: receiveWithAuthorizationTypedData({
         from: payer,
         to: MOCK_QUIETPAY_ADDRESS,
         value: s.amount,
         validAfter: 0n,
         validBefore: unix(s.expiresAt),
         nonce: paymentNonce(MOCK_QUIETPAY_ADDRESS, merchant.onchainId, orderIdFromSessionId(s.id)),
-      },
-    });
-    return { mode: "payment" as const, ...base, toSign: { payment } };
+      }),
+    } as const;
   }
-
   const plan = state.plans.find((p) => p.id === s.planId)!;
-  const cap = plan.amount * BigInt(PERIODS_IN_CAP);
-  const subscribe = toTypedDataPayload({
-    domain: quietPayDomain(MOCK_QUIETPAY_ADDRESS),
-    types: { Subscribe: quietPayTypes.Subscribe },
-    primaryType: "Subscribe",
-    message: { planId: plan.onchainId, subscriber: payer, maxAmount: plan.amount, nonce: 0n, deadline },
-  });
-  const permit = toTypedDataPayload({
-    domain: usdtDomain(),
-    types: { Permit: usdtTypes.Permit },
-    primaryType: "Permit",
-    message: {
+  return {
+    subscribe: subscribeTypedData(MOCK_QUIETPAY_ADDRESS, {
+      planId: plan.onchainId,
+      subscriber: payer,
+      maxAmount: plan.amount,
+      nonce: 0n,
+      deadline,
+    }),
+    permit: permitTypedData({
       owner: payer,
       spender: MOCK_QUIETPAY_ADDRESS,
-      value: cap,
+      value: plan.amount * BigInt(CAP_PERIODS),
       nonce: state.permitNonces.get(lower(payer)) ?? 0n,
       deadline,
-    },
-  });
-  return {
-    mode: "subscription" as const,
-    ...base,
-    spendingCap: fromUnits(cap),
-    periods: PERIODS_IN_CAP,
-    toSign: { subscribe, permit },
-  };
+    }),
+  } as const;
 }
 
 function createPlanRec(state: MockState, merchant: MerchantRec, body: BodyOf<"createPlan">): PlanRec {
-  const periodSeconds = body.interval === "custom" ? body.periodSeconds : PERIODS[body.interval];
-  if (!periodSeconds) throw new MockError("bad_request", "Custom plans need periodSeconds (at least 60).", 400);
+  const periodSeconds = body.interval === "custom" ? body.periodSeconds! : PERIODS[body.interval];
   state.counters.plan += 1n;
   const plan: PlanRec = {
     id: newId("plan"),
@@ -196,11 +188,11 @@ function createPlanRec(state: MockState, merchant: MerchantRec, body: BodyOf<"cr
   return plan;
 }
 
-async function createLinkRec(state: MockState, merchant: MerchantRec, body: BodyOf<"createPaymentLink">) {
+async function createLinkRec(state: MockState, merchant: MerchantRec, body: BodyOf<"createPaymentLink">): Promise<LinkRec> {
   const base = body.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "link";
   let slug = base;
   for (let i = 2; state.links.some((l) => l.slug === slug); i++) slug = `${base}-${i}`;
-  const link = {
+  const link: LinkRec = {
     id: newId("link"),
     merchantId: merchant.id,
     slug,
@@ -215,7 +207,7 @@ async function createLinkRec(state: MockState, merchant: MerchantRec, body: Body
   return link;
 }
 
-function createRefundRec(state: MockState, merchant: MerchantRec, body: BodyOf<"createRefund">) {
+function createRefundRec(state: MockState, merchant: MerchantRec, body: BodyOf<"createRefund">): RefundRec {
   const payment = state.payments.find((p) => p.id === body.paymentId && p.merchantId === merchant.id);
   if (!payment) throw new MockError("not_found", "Payment not found.", 404);
   const amount = toUnits(body.amount);
@@ -223,17 +215,18 @@ function createRefundRec(state: MockState, merchant: MerchantRec, body: BodyOf<"
     .filter((r) => r.paymentId === payment.id && (r.status === "awaiting_signature" || r.status === "submitted"))
     .reduce((acc, r) => acc + r.amount, 0n);
   const refundable = payment.amount - payment.refunded - pending;
-  if (amount <= 0n) throw new MockError("bad_request", "Refund amount must be more than 0.", 400);
+  if (amount <= 0n) throw new MockError("invalid_amount", "Refund amount must be more than 0.", 400);
   if (amount > refundable) {
     throw new MockError("refund_exceeds_payment", `You can refund at most ${fromUnits(refundable)} USDT for this payment.`, 422);
   }
-  const refund = {
+  const refund: RefundRec = {
     id: newId("re"),
     paymentId: payment.id,
     merchantId: merchant.id,
     amount,
     reason: body.reason ?? null,
-    status: "awaiting_signature" as const,
+    status: "awaiting_signature",
+    seq: null,
     txHash: null,
     error: null,
     createdAt: new Date(),
@@ -242,73 +235,101 @@ function createRefundRec(state: MockState, merchant: MerchantRec, body: BodyOf<"
   return refund;
 }
 
+function findRefund(state: MockState, merchant: MerchantRec, id: string): RefundRec {
+  const refund = state.refunds.find((r) => r.id === id && r.merchantId === merchant.id);
+  if (!refund) throw new MockError("not_found", "Refund not found.", 404);
+  if (refund.status !== "awaiting_signature") throw new MockError("conflict", "This refund has already been submitted.", 409);
+  return refund;
+}
+
+function refundTypedData(state: MockState, merchant: MerchantRec, refund: RefundRec) {
+  const payment = state.payments.find((p) => p.id === refund.paymentId)!;
+  const seq = refund.seq ?? payment.refundCount;
+  return receiveWithAuthorizationTypedData({
+    from: merchant.payoutAddress,
+    to: MOCK_QUIETPAY_ADDRESS,
+    value: refund.amount,
+    validAfter: 0n,
+    validBefore: unix(new Date(refund.createdAt.getTime() + 3_600_000)),
+    nonce: refundNonce(MOCK_QUIETPAY_ADDRESS, payment.onchainId, seq),
+  });
+}
+
 function csv(state: MockState, merchant: MerchantRec): string {
-  const header = "date,payment_id,kind,reference,payer,amount,fee,refunded,net,tx_hash,explorer_url";
   const rows = state.payments
     .filter((p) => p.merchantId === merchant.id)
     .map((p) => {
-      const out = toPayment(p);
-      return [out.paidAt, out.id, out.kind, out.reference, out.payer, out.amount, out.fee, out.refunded, out.net, out.txHash, out.explorerUrl]
+      const o = toPayment(p);
+      return [o.paidAt, o.id, o.kind, o.reference ?? "", o.payerAddress, o.amount, o.fee, o.refunded, o.net, o.txHash, o.explorerUrl]
         .map((v) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v))
         .join(",");
     });
-  return [header, ...rows].join("\n") + "\n";
+  return [PAYMENTS_CSV_COLUMNS.join(","), ...rows].join("\n") + "\n";
 }
 
 function overview(state: MockState, merchant: MerchantRec) {
-  const since = (ms: number) => state.payments.filter((p) => p.merchantId === merchant.id && Date.now() - p.paidAt.getTime() <= ms);
+  const mine = state.payments.filter((p) => p.merchantId === merchant.id);
+  const since = (ms: number) => mine.filter((p) => Date.now() - p.paidAt.getTime() <= ms);
   const sum = (ps: { amount: bigint }[]) => fromUnits(ps.reduce((a, p) => a + p.amount, 0n));
   const subs = state.subs.filter((s) => s.merchantId === merchant.id);
   const active = subs.filter((s) => s.status === "active");
-  const refunded7d = state.refunds
-    .filter((r) => r.merchantId === merchant.id && r.status === "succeeded" && Date.now() - r.createdAt.getTime() <= 7 * 86_400_000)
-    .reduce((a, r) => a + r.amount, 0n);
+  // Monthly recurring revenue, normalized to 30 days (per the shared contract).
+  const mrr = active.reduce((a, s) => {
+    const plan = state.plans.find((p) => p.id === s.planId)!;
+    return a + (plan.amount * 2_592_000n) / BigInt(plan.periodSeconds);
+  }, 0n);
+  const refunds = state.refunds.filter((r) => r.merchantId === merchant.id && r.status === "succeeded");
   return {
     volume24h: sum(since(86_400_000)),
     volume7d: sum(since(7 * 86_400_000)),
-    // Sum of active subscription amounts per billing period.
-    mrr: fromUnits(active.reduce((a, s) => a + state.plans.find((p) => p.id === s.planId)!.amount, 0n)),
+    mrr: fromUnits(mrr),
     activeSubscriptions: active.length,
     pastDueSubscriptions: subs.filter((s) => s.status === "past_due").length,
-    refunded7d: fromUnits(refunded7d),
-    paymentsCount: state.payments.filter((p) => p.merchantId === merchant.id).length,
+    refundsCount: refunds.length,
+    refundsTotal: fromUnits(refunds.reduce((a, r) => a + r.amount, 0n)),
+    paymentsCount: mine.length,
     gas: gasSummary(merchant),
-    customerGasPaidWbt: "0" as const,
   };
 }
 
-function merchantSubs(state: MockState, merchant: MerchantRec, status?: string) {
-  return state.subs.filter((s) => s.merchantId === merchant.id && (!status || s.status === status)).map((s) => toSubscription(state, s));
+function merchantSubs(state: MockState, merchant: MerchantRec, query?: { status?: string; limit?: number; cursor?: string }) {
+  const list = state.subs.filter((s) => s.merchantId === merchant.id && (!query?.status || s.status === query.status)).map((s) => toSubscription(state, s));
+  return paginate(list, query);
 }
 
-function findMerchantSub(state: MockState, merchant: MerchantRec, id: string) {
-  const sub = state.subs.find((s) => s.id === id && s.merchantId === merchant.id);
+function paymentsList(state: MockState, merchant: MerchantRec, query?: { limit?: number; cursor?: string; reference?: string }) {
+  const list = state.payments.filter((p) => p.merchantId === merchant.id && (!query?.reference || p.reference === query.reference)).map(toPayment);
+  return paginate(list, query);
+}
+
+const merchantName = (state: MockState, id: string) => state.merchants.find((m) => m.id === id)?.name ?? "Unknown business";
+
+function customerSub(state: MockState, caller: Caller, id: string) {
+  const sub = state.subs.find((s) => s.id === id && lower(s.subscriber) === lower(caller.address!));
   if (!sub) throw new MockError("not_found", "Subscription not found.", 404);
-  if (sub.status === "canceled") throw new MockError("bad_request", "This subscription is already canceled.", 409);
   return sub;
 }
 
-async function putWebhook(state: MockState, merchant: MerchantRec, url: string) {
-  merchant.webhookUrl = url;
-  return { url, secret: merchant.webhookSecret };
-}
-
-async function testWebhook(state: MockState, merchant: MerchantRec) {
-  const d = await emitWebhook(state, merchant.id, "ping", { message: "Test event from QuietPay" });
-  return toDelivery(d!);
-}
-
-function paymentsList(state: MockState, merchant: MerchantRec, query: { limit?: number; cursor?: string; reference?: string } | undefined) {
-  const list = state.payments
-    .filter((p) => p.merchantId === merchant.id && (!query?.reference || p.reference === query.reference))
-    .map(toPayment);
-  return paginate(list, query?.limit, query?.cursor);
-}
-
-// ── Handlers: one per endpoint in @quietpay/shared's map (TypeScript enforces completeness) ──
+// ── Handlers: one per endpoint in @quietpay/shared's Endpoints map (TypeScript enforces completeness) ──
 
 export const handlers: Handlers = {
-  // Merchant API
+  // ---- auth (mock: the token encodes role + address; see app.ts)
+  authNonce: () => {
+    const nonce = newId("nonce");
+    return { nonce, message: `Sign in to QuietPay\nNonce: ${nonce}`, expiresAt: new Date(Date.now() + 600_000).toISOString() };
+  },
+  authVerify: ({ state, body }) => {
+    const merchant = state.merchants.find((m) => lower(m.payoutAddress) === lower(body.address));
+    return {
+      token: `mock.${body.role}.${body.address}`,
+      role: body.role,
+      address: body.address,
+      merchantId: body.role === "merchant" ? (merchant?.id ?? null) : null,
+      expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+    };
+  },
+
+  // ---- merchant API (secret key or merchant JWT)
   createCheckoutSession: ({ state, caller, body }) => {
     const merchant = requireMerchant(caller);
     const id = newId("sess");
@@ -320,6 +341,7 @@ export const handlers: Handlers = {
       customerEmail: body.customerEmail ?? null,
       successUrl: body.successUrl,
       cancelUrl: body.cancelUrl,
+      paymentLinkId: null,
       paymentId: null,
       subscriptionId: null,
       txHash: null,
@@ -333,13 +355,14 @@ export const handlers: Handlers = {
         ...base,
         mode: "payment",
         lineItems: items,
-        amount: toUnits(sumAmounts(items.map((i) => i.amount))),
+        amount: items.reduce((a, i) => a + toUnits(i.amount), 0n),
         planId: null,
         expiresAt: new Date(Date.now() + (body.expiresInSeconds ?? 1_800) * 1000),
       };
     } else {
-      const plan = state.plans.find((p) => p.id === body.planId && p.merchantId === merchant.id && p.active);
+      const plan = state.plans.find((p) => p.id === body.planId && p.merchantId === merchant.id);
       if (!plan) throw new MockError("not_found", `Plan ${body.planId} not found.`, 404);
+      if (!plan.active) throw new MockError("plan_inactive", "This plan is no longer available.", 409);
       s = {
         ...base,
         mode: "subscription",
@@ -358,20 +381,26 @@ export const handlers: Handlers = {
     if (s.merchantId !== merchant.id) throw new MockError("not_found", "Session not found.", 404);
     return toCheckoutSession(state, s);
   },
-  createPaymentLink: async ({ state, caller, body }) => toLink(state, await createLinkRec(state, requireMerchant(caller), body)),
-  listPaymentLinks: ({ state, caller }) => {
+  createPaymentLink: async ({ state, caller, body }) => {
+    const link = await createLinkRec(state, requireMerchant(caller), body);
+    return { ...toLink(state, link), qrSvg: link.qrSvg };
+  },
+  listPaymentLinks: ({ state, caller, query }) => {
     const m = requireMerchant(caller);
-    return { data: state.links.filter((l) => l.merchantId === m.id).map((l) => toLink(state, l)), nextCursor: null };
+    return paginate(state.links.filter((l) => l.merchantId === m.id).map((l) => toLink(state, l)), query);
   },
   createPlan: ({ state, caller, body }) => toPlan(createPlanRec(state, requireMerchant(caller), body)),
-  listPlans: ({ state, caller }) => {
+  listPlans: ({ state, caller, query }) => {
     const m = requireMerchant(caller);
-    return { data: state.plans.filter((p) => p.merchantId === m.id).map(toPlan), nextCursor: null };
+    return paginate(state.plans.filter((p) => p.merchantId === m.id).map(toPlan), query);
   },
   listPayments: ({ state, caller, query }) => paymentsList(state, requireMerchant(caller), query),
-  listSubscriptions: ({ state, caller, query }) => ({ data: merchantSubs(state, requireMerchant(caller), query?.status), nextCursor: null }),
+  listSubscriptions: ({ state, caller, query }) => merchantSubs(state, requireMerchant(caller), query),
   cancelSubscription: async ({ state, caller, params }) => {
-    const sub = findMerchantSub(state, requireMerchant(caller), params.id!);
+    const m = requireMerchant(caller);
+    const sub = state.subs.find((s) => s.id === params.id && s.merchantId === m.id);
+    if (!sub) throw new MockError("not_found", "Subscription not found.", 404);
+    if (sub.status === "canceled") throw new MockError("subscription_not_active", "This subscription is already canceled.", 409);
     await cancelSubscription(state, sub, "merchant");
     return toSubscription(state, sub);
   },
@@ -380,37 +409,30 @@ export const handlers: Handlers = {
     return { ...toRefund(r), signUrl: `${state.config.webUrl}/dashboard/payments?refund=${r.id}` };
   },
   exportPaymentsCsv: ({ state, caller }) => csv(state, requireMerchant(caller)),
-  putWebhookEndpoint: ({ state, caller, body }) => putWebhook(state, requireMerchant(caller), body.url),
-  testWebhookEndpoint: ({ state, caller }) => testWebhook(state, requireMerchant(caller)),
-
-  // Wallet sign-in (mock: the token encodes role + address; signatures are checked but only warned on)
-  getAuthNonce: ({ state, query }) => {
-    const nonce = newId("nonce");
-    state.authNonces.set(lower(query.address), nonce);
-    return { nonce, message: `Sign in to QuietPay\nNonce: ${nonce}` };
+  updateWebhookEndpoint: ({ caller, body }) => {
+    const m = requireMerchant(caller);
+    m.webhookUrl = body.url;
+    return { url: body.url, secret: m.webhookSecret };
   },
-  verifyAuth: ({ state, body }) => {
-    const merchant = state.merchants.find((m) => lower(m.payoutAddress) === lower(body.address));
-    return {
-      token: `mock.${body.role}.${body.address}`,
-      role: body.role,
-      address: body.address,
-      merchantId: body.role === "merchant" ? (merchant?.id ?? null) : null,
-    };
+  testWebhookEndpoint: async ({ state, caller }) => {
+    const m = requireMerchant(caller);
+    const d = await emitWebhook(state, m.id, "ping", { merchantReference: null, txHash: null, explorerUrl: null, message: "Test event from QuietPay" });
+    return toDelivery(d!);
   },
 
-  // Dashboard
-  getDashMerchant: ({ caller }) => toMerchant(requireMerchant(caller)),
-  createDashMerchant: ({ state, caller, body }) => {
-    if (caller.merchant) throw new MockError("bad_request", "This wallet already has a QuietPay business.", 409);
+  // ---- dashboard (merchant JWT)
+  dashGetMerchant: ({ caller }) => toMerchant(requireMerchant(caller)),
+  dashOnboard: ({ state, caller, body }) => {
+    if (caller.merchant) throw new MockError("conflict", "This wallet already has a QuietPay business.", 409);
     if (!caller.address || lower(caller.address) !== lower(body.payoutAddress)) {
-      throw new MockError("bad_request", "The payout wallet must be the wallet you signed in with.", 400);
+      throw new MockError("forbidden", "The payout wallet must be the wallet you signed in with.", 403);
     }
     state.counters.merchant += 1n;
     const merchant: MerchantRec = {
-      id: newId("merch"),
+      id: newId("mer"),
       name: body.name,
       payoutAddress: body.payoutAddress as Address,
+      signerAddress: `0x${randomHash().slice(2, 42)}` as Address,
       onchainId: state.counters.merchant,
       webhookUrl: null,
       webhookSecret: newId("whsec"),
@@ -421,84 +443,65 @@ export const handlers: Handlers = {
       createdAt: new Date(),
     };
     state.merchants.push(merchant);
-    return { merchant: toMerchant(merchant), secretKey: merchant.secretKey, webhookSecret: merchant.webhookSecret };
+    return {
+      merchant: toMerchant(merchant),
+      secretKey: merchant.secretKey,
+      webhookSecret: merchant.webhookSecret,
+      token: `mock.merchant.${merchant.payoutAddress}`,
+    };
   },
-  rotateKeys: ({ caller }) => {
+  dashOverview: ({ state, caller }) => overview(state, requireMerchant(caller)),
+  dashPayments: ({ state, caller, query }) => paymentsList(state, requireMerchant(caller), query),
+  dashSubscriptions: ({ state, caller, query }) => merchantSubs(state, requireMerchant(caller), query),
+  dashWebhookDeliveries: ({ state, caller, query }) => {
     const m = requireMerchant(caller);
-    m.secretKey = newId("sk_test");
-    return { secretKey: m.secretKey };
+    return paginate(state.deliveries.filter((d) => d.merchantId === m.id).map(toDelivery), query);
   },
-  getDashOverview: ({ state, caller }) => overview(state, requireMerchant(caller)),
-  listDashPayments: ({ state, caller, query }) => paymentsList(state, requireMerchant(caller), query),
-  listDashSubscriptions: ({ state, caller, query }) => ({ data: merchantSubs(state, requireMerchant(caller), query?.status), nextCursor: null }),
-  cancelDashSubscription: async ({ state, caller, params }) => {
-    const sub = findMerchantSub(state, requireMerchant(caller), params.id!);
-    await cancelSubscription(state, sub, "merchant");
-    return toSubscription(state, sub);
-  },
-  listDashPlans: ({ state, caller }) => {
+  dashRefundTypedData: ({ state, caller, params }) => {
     const m = requireMerchant(caller);
-    return { data: state.plans.filter((p) => p.merchantId === m.id).map(toPlan), nextCursor: null };
-  },
-  createDashPlan: ({ state, caller, body }) => toPlan(createPlanRec(state, requireMerchant(caller), body)),
-  listDashPaymentLinks: ({ state, caller }) => {
-    const m = requireMerchant(caller);
-    return { data: state.links.filter((l) => l.merchantId === m.id).map((l) => toLink(state, l)), nextCursor: null };
-  },
-  createDashPaymentLink: async ({ state, caller, body }) => toLink(state, await createLinkRec(state, requireMerchant(caller), body)),
-  createDashRefund: ({ state, caller, body }) => toRefund(createRefundRec(state, requireMerchant(caller), body)),
-  getRefundTypedData: ({ state, caller, params }) => {
-    const m = requireMerchant(caller);
-    const refund = state.refunds.find((r) => r.id === params.id && r.merchantId === m.id);
-    if (!refund) throw new MockError("not_found", "Refund not found.", 404);
-    if (refund.status !== "awaiting_signature") throw new MockError("bad_request", "This refund has already been submitted.", 409);
+    const refund = findRefund(state, m, params.id!);
     const payment = state.payments.find((p) => p.id === refund.paymentId)!;
-    const toSign = toTypedDataPayload({
-      domain: usdtDomain(),
-      types: { ReceiveWithAuthorization: usdtTypes.ReceiveWithAuthorization },
-      primaryType: "ReceiveWithAuthorization",
-      message: {
-        from: m.payoutAddress,
-        to: MOCK_QUIETPAY_ADDRESS,
-        value: refund.amount,
-        validAfter: 0n,
-        validBefore: unix(new Date(Date.now() + 3_600_000)),
-        nonce: refundNonce(MOCK_QUIETPAY_ADDRESS, payment.onchainId, payment.refundCount),
-      },
-    });
-    return { refund: toRefund(refund), toSign };
+    refund.seq = refund.seq ?? payment.refundCount;
+    return { refund: toRefund(refund), signer: m.payoutAddress, typedData: json(ReceiveWithAuthorizationTypedData, refundTypedData(state, m, refund)) };
   },
-  submitRefund: ({ state, caller, params }) => {
+  dashRefundSubmit: async ({ state, caller, params, body }) => {
     const m = requireMerchant(caller);
-    const refund = state.refunds.find((r) => r.id === params.id && r.merchantId === m.id);
-    if (!refund) throw new MockError("not_found", "Refund not found.", 404);
-    if (refund.status !== "awaiting_signature") throw new MockError("bad_request", "This refund has already been submitted.", 409);
+    const refund = findRefund(state, m, params.id!);
+    await checkSignature(state, "refund", refundTypedData(state, m, refund), m.payoutAddress, body.signature as Hex);
     refund.status = "submitted";
     refund.txHash = randomHash();
     scheduleRefundConfirmation(state, refund);
-    return toRefund(refund);
+    return { refund: toRefund(refund), txHash: refund.txHash };
   },
-  listWebhookDeliveries: ({ state, caller }) => {
+  dashRotateKey: ({ caller }) => {
     const m = requireMerchant(caller);
-    return { data: state.deliveries.filter((d) => d.merchantId === m.id).slice(0, 100).map(toDelivery), nextCursor: null };
+    m.secretKey = newId("sk_test");
+    return { secretKey: m.secretKey, secretKeyPrefix: m.secretKey.slice(0, 12) };
   },
-  putDashWebhookEndpoint: ({ state, caller, body }) => putWebhook(state, requireMerchant(caller), body.url),
-  testDashWebhookEndpoint: ({ state, caller }) => testWebhook(state, requireMerchant(caller)),
-  exportDashPaymentsCsv: ({ state, caller }) => csv(state, requireMerchant(caller)),
-  recordGasTopup: ({ caller }) => {
+  dashGasTopup: ({ caller }) => {
     const m = requireMerchant(caller);
     m.gasBudgetWei += 50_000_000_000_000_000n;
     return gasSummary(m);
   },
 
-  // Public: checkout
-  getPublicSession: ({ state, params }) => toPublicSession(state, findSession(state, params.id!)),
-  prepareSession: ({ state, params, body }) => {
+  // ---- public: checkout
+  publicGetSession: ({ state, params }) => toPublicSession(state, findSession(state, params.id!)),
+  publicPrepareSession: ({ state, params, body }) => {
     const s = findSession(state, params.id!);
     requireOpen(s);
-    return buildPrepare(state, s, body.payer as Address);
+    const payer = body.payer as Address;
+    const balance = getBalance(state, payer);
+    const common = { payer, amount: fromUnits(s.amount), balance: fromUnits(balance), sufficientBalance: balance >= s.amount };
+    const td = typedDataFor(state, s, payer);
+    if ("payment" in td) return { mode: "payment" as const, ...common, typedData: { payment: json(ReceiveWithAuthorizationTypedData, td.payment as { message: unknown }) } };
+    return {
+      mode: "subscription" as const,
+      ...common,
+      spendingCap: fromUnits(s.amount * BigInt(CAP_PERIODS)),
+      typedData: { subscribe: json(SubscribeTypedData, td.subscribe), permit: json(PermitTypedData, td.permit) },
+    };
   },
-  submitSession: async ({ state, params, body }) => {
+  publicSubmitSession: async ({ state, params, body }) => {
     const s = findSession(state, params.id!);
     requireOpen(s);
     const payer = body.payer as Address;
@@ -506,38 +509,37 @@ export const handlers: Handlers = {
     if (getBalance(state, payer) < s.amount) {
       throw new MockError("insufficient_balance", `Your wallet has ${fromUnits(getBalance(state, payer))} USDT; this needs ${fromUnits(s.amount)} USDT.`, 402);
     }
-    const prepared = buildPrepare(state, s, payer);
-    if (prepared.mode === "payment") {
-      if (!body.signatures.payment) throw new MockError("bad_request", "Missing payment signature.", 400);
-      await warnOrRejectSignature(state, "payment", prepared.toSign.payment, payer, body.signatures.payment as Hex);
+    const td = typedDataFor(state, s, payer);
+    if ("payment" in td) {
+      if (!body.signatures.payment) throw new MockError("validation_failed", "Missing payment signature.", 400);
+      await checkSignature(state, "payment", td.payment, payer, body.signatures.payment as Hex);
     } else {
-      if (!body.signatures.subscribe || !body.signatures.permit) {
-        throw new MockError("bad_request", "Missing subscription signatures.", 400);
-      }
-      await warnOrRejectSignature(state, "subscribe", prepared.toSign.subscribe, payer, body.signatures.subscribe as Hex);
-      await warnOrRejectSignature(state, "permit", prepared.toSign.permit, payer, body.signatures.permit as Hex);
+      if (!body.signatures.subscribe || !body.signatures.permit) throw new MockError("validation_failed", "Missing subscription signatures.", 400);
+      await checkSignature(state, "subscribe", td.subscribe, payer, body.signatures.subscribe as Hex);
+      await checkSignature(state, "permit", td.permit, payer, body.signatures.permit as Hex);
       state.permitNonces.set(lower(payer), (state.permitNonces.get(lower(payer)) ?? 0n) + 1n);
     }
     s.status = "processing";
     s.payer = payer;
     s.txHash = randomHash();
     scheduleSessionConfirmation(state, s);
-    return { txHash: s.txHash };
+    return { txHash: s.txHash, status: s.status };
   },
-  getSessionStatus: ({ state, params }) => {
+  publicSessionStatus: ({ state, params }) => {
     const s = findSession(state, params.id!);
     const done = s.status === "complete";
     return {
       status: s.status,
       txHash: s.txHash,
+      explorerUrl: s.txHash ? explorerTx(s.txHash) : null,
       paymentId: s.paymentId,
       subscriptionId: s.subscriptionId,
       receiptUrl: done && s.paymentId ? `${state.config.webUrl}/r/${s.paymentId}` : null,
       redirectUrl: done ? s.successUrl : null,
-      explorerUrl: s.txHash ? explorerTx(s.txHash) : null,
+      error: null,
     };
   },
-  getPublicLink: ({ state, params }) => {
+  publicLink: ({ state, params }) => {
     const link = state.links.find((l) => l.slug === params.slug && l.active);
     if (!link) throw new MockError("not_found", "This payment link doesn't exist or has been turned off.", 404);
     const id = newId("sess");
@@ -554,75 +556,79 @@ export const handlers: Handlers = {
       successUrl: `${state.config.webUrl}/l/${link.slug}?status=paid`,
       cancelUrl: `${state.config.webUrl}/l/${link.slug}`,
       expiresAt: new Date(Date.now() + 1_800_000),
+      paymentLinkId: link.id,
       paymentId: null,
       subscriptionId: null,
       txHash: null,
       payer: null,
       createdAt: new Date(),
     });
-    return { sessionId: id, sessionUrl: `${state.config.webUrl}/c/${id}` };
+    return { sessionId: id, sessionUrl: `${state.config.webUrl}/c/${id}`, title: link.title, amount: fromUnits(link.amount) };
   },
-  getReceipt: ({ state, params }) => {
+  publicReceipt: ({ state, params }) => {
     const p = state.payments.find((x) => x.id === params.paymentId);
     if (!p) throw new MockError("not_found", "Receipt not found.", 404);
-    const merchant = state.merchants.find((m) => m.id === p.merchantId)!;
     return {
       paymentId: p.id,
-      merchant: { name: merchant.name },
+      merchant: { name: merchantName(state, p.merchantId) },
       kind: p.kind,
-      description: p.description,
+      status: paymentStatus(p),
       lineItems: p.lineItems,
+      planName: p.planName,
+      reference: p.reference,
       amount: fromUnits(p.amount),
       refunded: fromUnits(p.refunded),
-      payer: p.payer,
-      paidAt: p.paidAt.toISOString(),
+      payerAddress: p.payer,
       txHash: p.txHash,
       explorerUrl: explorerTx(p.txHash),
-      planName: p.planName,
+      paidAt: p.paidAt.toISOString(),
+      refunds: state.refunds
+        .filter((r) => r.paymentId === p.id && r.status === "succeeded")
+        .map((r) => ({ id: r.id, amount: fromUnits(r.amount), txHash: r.txHash, explorerUrl: r.txHash ? explorerTx(r.txHash) : null, createdAt: r.createdAt.toISOString() })),
     };
   },
-  getPortal: ({ state, caller }) => {
+  publicPortal: ({ state, caller }) => {
     const address = caller.address!;
-    const merchantName = (id: string) => state.merchants.find((m) => m.id === id)?.name ?? "Unknown business";
     return {
       address,
       subscriptions: state.subs
         .filter((s) => lower(s.subscriber) === lower(address))
-        .map((s) => ({ ...toSubscription(state, s), merchantName: merchantName(s.merchantId) })),
+        .map((s) => ({ ...toSubscription(state, s), merchantName: merchantName(state, s.merchantId) })),
       payments: state.payments
         .filter((p) => lower(p.payer) === lower(address))
-        .map((p) => ({ ...toPayment(p), merchantName: merchantName(p.merchantId), receiptUrl: `${state.config.webUrl}/r/${p.id}` })),
+        .map((p) => ({ ...toPayment(p), merchantName: merchantName(state, p.merchantId), receiptUrl: `${state.config.webUrl}/r/${p.id}` })),
     };
   },
-  prepareCancelSubscription: ({ state, caller, params }) => {
-    const sub = state.subs.find((s) => s.id === params.id && lower(s.subscriber) === lower(caller.address!));
-    if (!sub) throw new MockError("not_found", "Subscription not found.", 404);
-    const toSign = toTypedDataPayload({
-      domain: quietPayDomain(MOCK_QUIETPAY_ADDRESS),
-      types: { CancelSubscription: quietPayTypes.CancelSubscription },
-      primaryType: "CancelSubscription",
-      message: { subId: sub.onchainId, nonce: 0n, deadline: unix(new Date(Date.now() + 1_800_000)) },
-    });
-    return { toSign };
+  publicPortalCancelPrepare: ({ state, caller, params }) => {
+    const sub = customerSub(state, caller, params.id!);
+    if (sub.status === "canceled") throw new MockError("subscription_not_active", "This subscription is already canceled.", 409);
+    const typedData = json(CancelSubscriptionTypedData, cancelSubscriptionTypedData(MOCK_QUIETPAY_ADDRESS, { subId: sub.onchainId, nonce: 0n, deadline: unix(new Date(Date.now() + 1_800_000)) }));
+    return { subscriptionId: sub.id, typedData };
   },
-  submitCancelSubscription: async ({ state, caller, params }) => {
-    const sub = state.subs.find((s) => s.id === params.id && lower(s.subscriber) === lower(caller.address!));
-    if (!sub) throw new MockError("not_found", "Subscription not found.", 404);
-    if (sub.status === "canceled") throw new MockError("bad_request", "This subscription is already canceled.", 409);
-    await cancelSubscription(state, sub, "customer");
-    return toSubscription(state, sub);
+  publicPortalCancelSubmit: async ({ state, caller, params }) => {
+    const sub = customerSub(state, caller, params.id!);
+    if (sub.status === "canceled") throw new MockError("subscription_not_active", "This subscription is already canceled.", 409);
+    const txHash = await cancelSubscription(state, sub, "customer");
+    return { txHash, subscription: { ...toSubscription(state, sub), merchantName: merchantName(state, sub.merchantId) } };
   },
 
-  // Demo + health
+  // ---- demo + health
   demoFund: ({ state, body }) => {
     const last = state.demoFundedAt.get(lower(body.address));
     if (last && Date.now() - last < 10 * 60_000) {
-      throw new MockError("rate_limited", "This wallet got test USDT less than 10 minutes ago. Try again later.", 429);
+      throw new MockError("demo_fund_cooldown", "This wallet got test USDT less than 10 minutes ago. Try again later.", 429);
     }
     state.demoFundedAt.set(lower(body.address), Date.now());
     setBalance(state, body.address, getBalance(state, body.address) + toUnits("50.00"));
-    return { txHash: randomHash(), amount: "50.00" };
+    const txHash = randomHash();
+    return { txHash, explorerUrl: explorerTx(txHash), amount: "50.00" };
   },
-  health: () => ({ ok: true, rpc: true, relayerWbt: "0.4200", indexerLagBlocks: 0 }),
+  health: ({ state }) => ({
+    ok: true,
+    chainId: 1874,
+    rpc: { ok: true, blockNumber: state.counters.block.toString() },
+    relayer: { address: MOCK_RELAYER_ADDRESS, balanceWei: "420000000000000000", balance: "0.42", low: false },
+    indexer: { lastBlock: state.counters.block.toString(), lagBlocks: 0 },
+    contract: { quietPay: MOCK_QUIETPAY_ADDRESS, usdt: USDT_ADDRESS },
+  }),
 };
-

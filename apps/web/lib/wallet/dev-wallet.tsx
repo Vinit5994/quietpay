@@ -3,8 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { toSignableTypedData, type TypedDataPayload } from "@quietpay/shared";
 import { SignatureRejectedError, type Wallet } from "./types";
+import { toSignable, type TypedDataJson } from "./typed-data";
 
 const STORAGE_KEY = "quietpay.demoWallet.v1";
 
@@ -62,14 +62,14 @@ export function DevWalletProvider({ children }: { children: React.ReactNode }) {
     setKey(null);
   }, []);
 
-  const signTypedData = useCallback(async (payload: TypedDataPayload, purpose: string) => {
+  const signTypedData = useCallback(async (payload: TypedDataJson, purpose: string) => {
     const k = keyRef.current;
     if (!k) throw new Error("Sign in first");
     const approved = await new Promise<boolean>((resolve) => setPending({ purpose, resolve }));
     setPending(null);
     if (!approved) throw new SignatureRejectedError();
     const acct = privateKeyToAccount(k);
-    return acct.signTypedData(toSignableTypedData(payload) as Parameters<typeof acct.signTypedData>[0]);
+    return acct.signTypedData(toSignable(payload) as Parameters<typeof acct.signTypedData>[0]);
   }, []);
 
   const wallet: Wallet = {

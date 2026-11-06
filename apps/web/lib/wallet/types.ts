@@ -1,5 +1,5 @@
 import type { Address, Hex } from "viem";
-import type { TypedDataPayload } from "@quietpay/shared";
+import type { TypedDataJson } from "./typed-data";
 
 export type WalletStatus = "loading" | "signed_out" | "signed_in";
 
@@ -20,7 +20,7 @@ export interface Wallet {
    * Sign typed data from the API (uint values as decimal strings).
    * Rejects with SignatureRejectedError when the person closes or declines the request.
    */
-  signTypedData(payload: TypedDataPayload, purpose: string): Promise<Hex>;
+  signTypedData(payload: TypedDataJson, purpose: string): Promise<Hex>;
 }
 
 export class SignatureRejectedError extends Error {

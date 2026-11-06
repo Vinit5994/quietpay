@@ -12,11 +12,12 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.14.0",
-    "@quietpay/shared": "link:./shared",
+    "@quietpay/shared": "workspace:*",
     "hono": "^4.7.0",
     "qrcode": "^1.5.4",
-    "viem": "^2.30.0",
-    "zod": "^3.25.0"
+    "viem": "^2.57.16",
+    "zod": "^4.6.7",
+    "@quietpay/node": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
