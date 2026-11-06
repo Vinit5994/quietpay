@@ -158,6 +158,17 @@ describe("webhook dispatcher", () => {
   });
 });
 
+describe("dispatcher claims", () => {
+  it("never sends the same delivery twice when the loop and a direct attempt race", async () => {
+    const ctx = await paidSession();
+    await ctx.indexer.tick();
+    const row = ctx.deps.db.select().from(webhookDeliveries).get()!;
+    await Promise.all([ctx.dispatcher.attempt(row), ctx.dispatcher.attempt(row), ctx.dispatcher.tick()]);
+    const sentForRow = ctx.webhook.calls.filter((c) => JSON.parse(c.body).id === row.eventId);
+    expect(sentForRow).toHaveLength(1);
+  });
+});
+
 describe("webhook endpoint API", () => {
   it("PUT sets the URL and rotates the secret; test sends a verifiable ping", async () => {
     const ctx = setup();
