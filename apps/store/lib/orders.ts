@@ -28,6 +28,8 @@ export interface Order {
   total: string;
   refunded: string;
   checkoutUrl: string | null;
+  /** QuietPay checkout session id */
+  sessionId: string | null;
   paymentId: string | null;
   txHash: string | null;
   explorerUrl: string | null;
@@ -113,6 +115,7 @@ export function createOrder(items: CartItemInput[]): Order {
     total: sumAmounts(lines.map((l) => l.total)),
     refunded: "0.00",
     checkoutUrl: null,
+    sessionId: null,
     paymentId: null,
     txHash: null,
     explorerUrl: null,
@@ -141,4 +144,8 @@ export function listOrders(): Order[] {
 
 export function listBoxes(): Box[] {
   return readData().boxes;
+}
+
+export function findBox(id: string): Box | undefined {
+  return readData().boxes.find((b) => b.id === id);
 }

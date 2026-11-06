@@ -5,14 +5,16 @@ import { AutoRefresh } from "@/components/AutoRefresh";
 import { ClearCart } from "@/components/ClearCart";
 import { StatusChip } from "@/components/StatusChip";
 import { getOrder } from "@/lib/orders";
+import { syncPendingOrder } from "@/lib/sync";
 import { formatUsdt } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Order" };
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
-  const order = getOrder((await params).id);
-  if (!order) notFound();
+  const found = getOrder((await params).id);
+  if (!found) notFound();
+  const order = await syncPendingOrder(found);
   const waiting = order.status === "pending";
 
   return (

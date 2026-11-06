@@ -1,6 +1,13 @@
-// QuietPay webhook receiver. Verification with @quietpay/node and order updates are added in task B6.
+import { qp } from "@/lib/quietpay";
+import { handleQuietPayEvent } from "@/lib/webhook-handler";
+
 export async function POST(req: Request) {
-  const body = await req.text();
-  console.log("[webhook] received (not verified yet, B6):", body.slice(0, 200));
-  return new Response("ok");
+  let event;
+  try {
+    event = qp.webhooks.verify(await req.text(), req.headers.get("quietpay-signature"), process.env.QUIETPAY_WEBHOOK_SECRET!);
+  } catch {
+    return new Response("invalid signature", { status: 400 });
+  }
+  const result = handleQuietPayEvent(event);
+  return Response.json({ received: true, result });
 }
