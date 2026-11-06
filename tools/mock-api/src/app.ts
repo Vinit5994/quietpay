@@ -108,6 +108,14 @@ export function createApp(state: MockState) {
     return c.json({ address, balance: amount });
   });
   app.get("/mock/balance/:address", (c) => c.json({ address: c.req.param("address"), units: getBalance(state, c.req.param("address")).toString() }));
+  /** Point the seeded Swag Counter merchant (with sample data) at your wallet, so the dashboard signs in to it. */
+  app.post("/mock/claim-demo-merchant", async (c) => {
+    const { address } = z.object({ address: z.string().regex(/^0x[0-9a-fA-F]{40}$/) }).parse(await c.req.json());
+    for (const m of state.merchants) if (m.id !== SEEDED.merchantId && m.payoutAddress.toLowerCase() === address.toLowerCase()) m.payoutAddress = "0x000000000000000000000000000000000000dEaD";
+    const merchant = state.merchants.find((m) => m.id === SEEDED.merchantId)!;
+    merchant.payoutAddress = address as `0x${string}`;
+    return c.json({ merchantId: merchant.id, payoutAddress: address });
+  });
   app.post("/mock/fail-next-renewal/:subId", (c) => {
     const sub = state.subs.find((s) => s.id === c.req.param("subId"));
     if (!sub) throw new MockError("not_found", "Subscription not found.", 404);
