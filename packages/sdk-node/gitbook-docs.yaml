@@ -8,4 +8,4 @@ site:
       path: documentation
       default: true
       content:
-        directory: ./packages/sdk-nod/gitbook.yaml
+        directory: null
