@@ -1,0 +1,6 @@
+# GitBook space config. This directory is the space's content (see ../gitbook-docs.yaml).
+root: ./
+
+structure:
+  readme: README.md
+  summary: SUMMARY.md

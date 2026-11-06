@@ -1,6 +1,8 @@
+# GitBook site-level Git Sync. In GitBook: project directory = packages/sdk-node, sync GitHub → GitBook.
+# Edit the docs here in the repo, not in the GitBook editor (two-way sync commits straight to main).
 $schema: https://api.gitbook.com/gitbook-docs.yaml
 site:
-  title: Quietpay Docs
+  title: QuietPay Docs
   structure:
     - type: space
       key: space-1
@@ -8,4 +10,4 @@ site:
       path: documentation
       default: true
       content:
-        directory: null
+        directory: docs
