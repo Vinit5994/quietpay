@@ -19,3 +19,20 @@ export function intervalLabel(periodSeconds: number): string {
   }
   return `every ${periodSeconds} seconds`;
 }
+
+/** "1234.5" → "1,234.50 USDT" (grouped, 2+ decimals). */
+export function usdt(amount: string, { symbol = true } = {}): string {
+  const negative = amount.startsWith("-");
+  const [whole = "0", frac = ""] = amount.replace("-", "").split(".");
+  const f = frac.length >= 2 ? frac.replace(/(\d{2}\d*?)0+$/, "$1") : frac.padEnd(2, "0");
+  return `${negative ? "−" : ""}${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${f}${symbol ? " USDT" : ""}`;
+}
+
+/** "3 min ago", "2 h ago", "Nov 6, 14:02" */
+export function timeAgo(iso: string, now = Date.now()): string {
+  const s = Math.round((now - new Date(iso).getTime()) / 1000);
+  if (s < 45) return "just now";
+  if (s < 3_600) return `${Math.round(s / 60)} min ago`;
+  if (s < 86_400) return `${Math.round(s / 3_600)} h ago`;
+  return new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
