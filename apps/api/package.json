@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.14.0",
+    "@quietpay/node": "workspace:*",
     "@quietpay/shared": "workspace:*",
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.45.4",
