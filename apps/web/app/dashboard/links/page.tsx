@@ -16,7 +16,7 @@ function Qr({ url, size = 128 }: { url: string; size?: number }) {
   }, [url]);
   return (
     <div
-      className="shrink-0 rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] bg-white p-1.5"
+      className="shrink-0 rounded-[var(--radius-base)] border border-[var(--color-line)] bg-white p-1.5"
       style={{ width: size, height: size }}
       role="img"
       aria-label={`QR code for ${url}`}
@@ -76,7 +76,7 @@ export default function LinksPage() {
           <div className="flex flex-col items-center gap-3">
             <Qr url={showing.url} size={260} />
             <p className="tabular text-xl font-semibold">{usdt(showing.amount)}</p>
-            <a href={showing.url} target="_blank" rel="noreferrer" className="break-all text-sm font-bold text-[var(--color-link)] underline decoration-2 underline-offset-2 hover:decoration-[var(--color-accent)]">
+            <a href={showing.url} target="_blank" rel="noreferrer" className="break-all text-sm font-semibold text-[var(--color-link)] underline decoration-1 underline-offset-2 hover:decoration-[var(--color-link)]">
               {showing.url}
             </a>
           </div>

@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Sans, Space_Grotesk } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const body = DM_Sans({ subsets: ["latin"], variable: "--font-body", display: "swap" });
-const heading = Space_Grotesk({ subsets: ["latin"], weight: ["500", "700"], variable: "--font-heading", display: "swap" });
+const body = Geist({ subsets: ["latin"], variable: "--font-body", display: "swap" });
+const code = Geist_Mono({ subsets: ["latin"], variable: "--font-code", display: "swap" });
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
@@ -15,7 +15,7 @@ export const viewport: Viewport = { width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${body.variable} ${heading.variable}`}>
+    <html lang="en" className={`${body.variable} ${code.variable}`}>
       <body className="min-h-dvh font-sans antialiased">
         <Providers>{children}</Providers>
       </body>

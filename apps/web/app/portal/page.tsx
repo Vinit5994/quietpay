@@ -17,7 +17,7 @@ export default function PortalPage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-10">
-      <p className="inline-flex items-center gap-1.5 rounded-full border-2 border-[var(--color-ink)] bg-[var(--color-accent)] px-2.5 py-0.5 text-xs font-black uppercase tracking-wider">QuietPay</p>
+      <p className="text-sm font-semibold text-[var(--color-brand)]">QuietPay</p>
       <h1 className="mt-1 text-2xl font-semibold">Your payments</h1>
       <p className="mt-1 text-sm text-[var(--color-muted)]">Subscriptions and receipts for everything you paid with QuietPay.</p>
 
@@ -133,7 +133,7 @@ function Portal({ token, onExpired }: { token: string; onExpired: () => void }) 
                 <div className="flex items-center gap-4">
                   <span className="tabular font-semibold">{usdt(p.amount)}</span>
                   <StatusChip status={p.status} />
-                  <Link href={`/r/${p.id}`} className="text-sm font-bold text-[var(--color-link)] underline decoration-2 underline-offset-2 hover:decoration-[var(--color-accent)]">
+                  <Link href={`/r/${p.id}`} className="text-sm font-semibold text-[var(--color-link)] underline decoration-1 underline-offset-2 hover:decoration-[var(--color-link)]">
                     Receipt
                   </Link>
                 </div>
