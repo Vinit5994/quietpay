@@ -45,6 +45,9 @@ export type FakeChain = Chain & {
   advance(seconds: number): void;
   subs: Map<bigint, FakeSub>;
   plans: Map<bigint, FakePlan>;
+  /** native WBT txs the gas top-up check can look up */
+  nativeTxs: Record<string, { from: Address; to: Address | null; value: bigint; success: boolean }>;
+  demoSent: { to: Address; amount: bigint }[];
 };
 
 const PAYMENT_RECEIVED = "PaymentReceived";
@@ -95,12 +98,19 @@ export function fakeChain(balances: Record<string, bigint> = {}): FakeChain {
     },
     subs: new Map(),
     plans: new Map(),
+    nativeTxs: {},
+    demoSent: [],
+    nativeTransfer: async (hash) => chain.nativeTxs[lc(hash)] ?? null,
+    demoTransfer: async (to, amount) => {
+      chain.demoSent.push({ to, amount });
+      return keccak256(toHex(`demo${chain.demoSent.length}${Math.random()}`));
+    },
     quietPay: QUIETPAY,
     relayerAddress: privateKeyToAccount(generatePrivateKey()).address,
     usdtBalance: async (owner) => balances[lc(owner)] ?? 0n,
     verifyMessage: (args) => verifyMessage(args),
     verifyTypedData: (args) => verifyTypedData(args as never),
-    registerMerchant: async () => ({ merchantId: 1n, txHash: `0x${"00".repeat(32)}` }),
+    registerMerchant: async () => ({ merchantId: BigInt(100 + chain.sent.length + Math.floor(Math.random() * 1e6)), txHash: `0x${"00".repeat(32)}` }),
     sigNonce: async (owner) => sigNonces.get(lc(owner)) ?? 0n,
     usdtNonce: async (owner) => usdtNonces.get(lc(owner)) ?? 0n,
     usdtAllowance: async (owner) => chain.allowances[lc(owner)] ?? 0n,
