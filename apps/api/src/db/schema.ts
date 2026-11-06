@@ -54,6 +54,8 @@ export const checkoutSessions = sqliteTable(
     txHash: text("tx_hash"),
     paymentLinkId: text("payment_link_id"),
     lastError: text("last_error"),
+    /** subscription mode: the Subscribe + Permit typed data /prepare returned (submit verifies against it) */
+    preparedJson: text("prepared_json"),
     createdAt: integer("created_at").notNull(),
   },
   (t) => [
@@ -77,7 +79,9 @@ export const paymentLinks = sqliteTable(
   (t) => [uniqueIndex("payment_links_slug").on(t.slug)],
 );
 
-export const plans = sqliteTable("plans", {
+export const plans = sqliteTable(
+  "plans",
+  {
   id: text("id").primaryKey(), // plan_…
   merchantId: text("merchant_id").notNull(),
   onchainPlanId: text("onchain_plan_id").notNull(),
@@ -88,7 +92,9 @@ export const plans = sqliteTable("plans", {
   graceSeconds: integer("grace_seconds").notNull(),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
   createdAt: integer("created_at").notNull(),
-});
+  },
+  (t) => [uniqueIndex("plans_onchain").on(t.onchainPlanId)],
+);
 
 export const subscriptions = sqliteTable(
   "subscriptions",
@@ -107,9 +113,12 @@ export const subscriptions = sqliteTable(
     failedAttempts: integer("failed_attempts").notNull().default(0),
     lastAttemptAt: integer("last_attempt_at"),
     cancelReason: text("cancel_reason", { enum: ["customer", "nonpayment", "merchant"] }),
+    sessionId: text("session_id"),
+    /** portal cancel: the CancelSubscription typed data /cancel/prepare returned */
+    cancelPreparedJson: text("cancel_prepared_json"),
     createdAt: integer("created_at").notNull(),
   },
-  (t) => [uniqueIndex("subscriptions_onchain").on(t.onchainSubId)],
+  (t) => [uniqueIndex("subscriptions_onchain").on(t.onchainSubId), index("subscriptions_subscriber").on(t.subscriberAddress)],
 );
 
 export const payments = sqliteTable(
