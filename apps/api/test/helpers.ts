@@ -12,12 +12,13 @@ import {
 import { checkoutPaymentId, quietPayAbi } from "@quietpay/shared";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { createApp } from "../src/app";
-import type { Chain, RelayFunction, TxReceipt } from "../src/chain";
+import type { Chain, ChainEvent, RelayFunction, TxReceipt } from "../src/chain";
 import { openDb } from "../src/db/client";
 import { merchants } from "../src/db/schema";
 import type { Deps } from "../src/deps";
 import { loadEnv } from "../src/env";
 import { Relayer } from "../src/relayer";
+import { Dispatcher } from "../src/webhooks";
 import { encrypt, newSecretKey, newWebhookSecret } from "../src/lib/crypto";
 import { newId, nowSeconds } from "../src/lib/ids";
 
@@ -32,6 +33,9 @@ export type FakeChain = Chain & {
   gasPriceWei: bigint;
   relayerBalanceWei: bigint;
   sent: { fn: RelayFunction; args: readonly unknown[]; hash: Hex }[];
+  /** QuietPay events the indexer will see; `send("pay")` appends one */
+  events: ChainEvent[];
+  head: bigint;
 };
 
 /** A fake chain: balances from a map, EOA signature checks, and a `pay` that emits PaymentReceived. No network. */
@@ -42,6 +46,8 @@ export function fakeChain(balances: Record<string, bigint> = {}): FakeChain {
     gasPriceWei: 5_000_000_000n,
     relayerBalanceWei: 10n ** 18n,
     sent: [],
+    events: [],
+    head: 100n,
     quietPay: QUIETPAY,
     relayerAddress: privateKeyToAccount(generatePrivateKey()).address,
     usdtBalance: async (owner) => balances[owner.toLowerCase()] ?? 0n,
@@ -81,6 +87,16 @@ export function fakeChain(balances: Record<string, bigint> = {}): FakeChain {
           logIndex: 0,
           removed: false,
         });
+        chain.head += 1n;
+        if (!chain.revertOnChain) {
+          chain.events.push({
+            eventName: "PaymentReceived",
+            args: { paymentId: checkoutPaymentId(merchantId, orderId), merchantId, ref: orderId, payer, amount, fee: 0n, kind: 0, subId: 0n },
+            blockNumber: chain.head,
+            transactionHash: hash,
+            logIndex: 0,
+          });
+        }
       }
       receipts.set(hash, {
         status: chain.revertOnChain ? "reverted" : "success",
@@ -94,6 +110,8 @@ export function fakeChain(balances: Record<string, bigint> = {}): FakeChain {
     async waitForReceipt(hash) {
       return receipts.get(hash)!;
     },
+    blockNumber: async () => chain.head,
+    quietPayLogs: async (from, to) => chain.events.filter((e) => e.blockNumber >= from && e.blockNumber <= to),
   };
   return chain;
 }
@@ -113,13 +131,21 @@ export function setup(opts: { onchainId?: string } = {}) {
   const chain = fakeChain();
   const deps: Deps = { env, db: openDb(":memory:"), chain };
   const relayer = new Relayer(deps);
-  const app = createApp(deps, relayer);
+  /** Webhook POSTs the dispatcher made; reply with `webhookStatus` (default 200). */
+  const webhook = { calls: [] as { url: string; headers: Headers; body: string }[], status: 200, clock: 1_800_000_000 };
+  const fakeFetch = (async (url: string | URL, init?: RequestInit) => {
+    webhook.calls.push({ url: String(url), headers: new Headers(init?.headers), body: String(init?.body) });
+    return new Response("ok", { status: webhook.status });
+  }) as typeof fetch;
+  const dispatcher = new Dispatcher(deps, fakeFetch, () => webhook.clock);
+  const app = createApp(deps, { relayer, dispatcher });
 
   const addMerchant = (name: string, onchainId: string) => {
     const signerKey = generatePrivateKey();
     const payoutKey = generatePrivateKey();
     const payout = privateKeyToAccount(payoutKey).address;
     const sk = newSecretKey();
+    const whsec = newWebhookSecret();
     const id = newId("mer");
     deps.db
       .insert(merchants)
@@ -133,13 +159,13 @@ export function setup(opts: { onchainId?: string } = {}) {
         signerKeyEnc: encrypt(signerKey, env.ENCRYPTION_KEY),
         secretKeyHash: sk.hash,
         secretKeyPrefix: sk.prefix,
-        webhookUrl: null,
-        webhookSecret: newWebhookSecret(),
+        webhookUrl: "http://store.test/api/webhooks/quietpay",
+        webhookSecret: whsec,
         gasBudgetWei: "50000000000000000",
         createdAt: nowSeconds(),
       })
       .run();
-    return { id, secretKey: sk.key, signer: privateKeyToAccount(signerKey), payout: privateKeyToAccount(payoutKey), onchainId };
+    return { id, webhookSecret: whsec, secretKey: sk.key, signer: privateKeyToAccount(signerKey), payout: privateKeyToAccount(payoutKey), onchainId };
   };
 
   const merchant = addMerchant("Swag Counter", opts.onchainId ?? "7");
@@ -158,7 +184,7 @@ export function setup(opts: { onchainId?: string } = {}) {
     return { status: res.status, body: text ? (JSON.parse(text) as any) : undefined };
   };
 
-  return { app, deps, chain, relayer, merchant, addMerchant, call };
+  return { app, deps, chain, relayer, dispatcher, webhook, merchant, addMerchant, call };
 }
 
 export const hoodieSession = {

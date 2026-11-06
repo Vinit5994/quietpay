@@ -14,7 +14,7 @@ Every main-flow transaction uses the official test USDT `0xcedfB56113143d55b2358
 | setOperator(relayer B) | https://explorer.testnet.whitechain.io/tx/0xa5545463f24ee71a40413eb514c7f34388ea28a6d376c2b0e880df36bf85a118 | A5, Person B's API relayer `0xb033…d709` |
 | Register test merchant #1 | https://explorer.testnet.whitechain.io/tx/0x76841c89bb9f7fbfb93523f530139baca4956a7119b828ed3206582fbd5deb05 | A5, `pnpm first-payment` |
 | First payment (pay, 1.00 USDT) | https://explorer.testnet.whitechain.io/tx/0x43fb0019d4f97cad1549b57a7d52d943e4bfb9d1ce987df040d45a9f8d076bca | A5, merchant #1, EIP-3009 signature, 243,822 gas paid by the relayer |
-| Checkout payment via API | | A7 |
+| Checkout payment via API | https://explorer.testnet.whitechain.io/tx/0x988fb089aeed108489056a856d653375d6280e2b194abc705cb10051e22924c6 | A7, `pnpm pay-session`: /prepare → payer signs → /submit, relayer pays 243,754 gas |
 | Payment link payment | | A11 |
 | Subscribe (first charge) | | A9 |
 | Renewal | | A9 |
