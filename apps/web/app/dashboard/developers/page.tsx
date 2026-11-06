@@ -1,34 +1,21 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { WebhookDelivery } from "@quietpay/shared";
-import { Button, CopyField, Field, Modal, Notice, PageHeader, Panel, Skeleton, StatusChip, Table, inputCls } from "@/components/ui/kit";
+import { Button, CopyField, Field, Modal, Notice, PageHeader, Panel, Skeleton, StatusChip, Table, inputCls, Pager } from "@/components/ui/kit";
 import { ApiError, api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 import { useMerchantAuth, useMerchantToken } from "@/lib/merchant-auth";
-import { useApi } from "@/lib/use-api";
+import { PAGE_SIZE, useApi, usePager } from "@/lib/use-api";
 
-const snippet = `import { QuietPay } from "@quietpay/node";
-const qp = new QuietPay(process.env.QUIETPAY_SECRET_KEY!);
-
-// checkout: create a session, redirect the customer to session.url
-const session = await qp.checkout.sessions.create({
-  mode: "payment",
-  reference: order.id,
-  lineItems: [{ name: "Builder Hoodie", unitAmount: "25.00", quantity: 1 }],
-  successUrl: \`\${STORE_URL}/orders/\${order.id}\`,
-  cancelUrl: \`\${STORE_URL}/cart\`,
-});
-
-// webhook route: verify, then update your order
-const event = qp.webhooks.verify(rawBody, req.headers.get("quietpay-signature"), process.env.QUIETPAY_WEBHOOK_SECRET!);
-if (event.type === "payment.succeeded") markPaid(event.data.merchantReference);`;
 
 export default function DevelopersPage() {
   const token = useMerchantToken();
   const { session, refreshMerchant } = useMerchantAuth();
   const merchant = session.state === "ready" ? session.merchant : null;
-  const deliveries = useApi((signal) => api("dashWebhookDeliveries", { token, signal, query: { limit: 50 } }), [token], { pollMs: 4000 });
+  const pager = usePager();
+  const deliveries = useApi((signal) => api("dashWebhookDeliveries", { token, signal, query: { limit: PAGE_SIZE, cursor: pager.cursor } }), [token, pager.cursor], { pollMs: pager.page === 1 ? 4000 : undefined });
 
   const [newKey, setNewKey] = useState<string | null>(null);
   const [newSecret, setNewSecret] = useState<string | null>(null);
@@ -142,11 +129,16 @@ export default function DevelopersPage() {
             ))}
           </Table>
         )}
+        <Pager page={pager.page} hasNext={Boolean(deliveries.data?.nextCursor)} loading={deliveries.loading} onPrev={pager.prev} onNext={() => deliveries.data?.nextCursor && pager.next(deliveries.data.nextCursor)} />
       </Panel>
 
-      <Panel title="Integrate in ~20 lines" className="mt-6">
-        <pre className="overflow-x-auto p-5 font-mono text-xs leading-relaxed">{snippet}</pre>
-      </Panel>
+      <p className="mt-6 text-sm text-[var(--color-muted)]">
+        Looking for the integration code?{" "}
+        <Link href="/dashboard/integrate" className="text-[var(--color-link)] hover:underline">
+          Open the Integrate guide
+        </Link>
+        .
+      </p>
 
       {viewing ? (
         <Modal title={viewing.type} onClose={() => setViewing(null)}>

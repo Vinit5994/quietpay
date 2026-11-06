@@ -2,16 +2,17 @@
 
 import { useState } from "react";
 import type { Payment } from "@quietpay/shared";
-import { Button, Field, Modal, Notice, PageHeader, Panel, Skeleton, StatusChip, Table, TxLink, inputCls } from "@/components/ui/kit";
+import { Button, Field, Modal, Notice, PageHeader, Panel, Skeleton, StatusChip, Table, TxLink, inputCls, Pager } from "@/components/ui/kit";
 import { ApiError, api } from "@/lib/api";
 import { shortAddress, timeAgo, usdt } from "@/lib/format";
 import { useMerchantToken } from "@/lib/merchant-auth";
-import { useApi } from "@/lib/use-api";
+import { PAGE_SIZE, useApi, usePager } from "@/lib/use-api";
 import { SignatureRejectedError, useWallet } from "@/lib/wallet";
 
 export default function PaymentsPage() {
   const token = useMerchantToken();
-  const payments = useApi((signal) => api("dashPayments", { token, signal, query: { limit: 100 } }), [token], { pollMs: 4000 });
+  const pager = usePager();
+  const payments = useApi((signal) => api("dashPayments", { token, signal, query: { limit: PAGE_SIZE, cursor: pager.cursor } }), [token, pager.cursor], { pollMs: pager.page === 1 ? 4000 : undefined });
   const [refunding, setRefunding] = useState<Payment | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -80,6 +81,7 @@ export default function PaymentsPage() {
             ))}
           </Table>
         )}
+        <Pager page={pager.page} hasNext={Boolean(payments.data?.nextCursor)} loading={payments.loading} onPrev={pager.prev} onNext={() => payments.data?.nextCursor && pager.next(payments.data.nextCursor)} />
       </Panel>
       {refunding ? (
         <RefundModal

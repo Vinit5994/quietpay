@@ -3,11 +3,11 @@
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import type { PaymentLink } from "@quietpay/shared";
-import { Button, CopyField, Field, Modal, Notice, PageHeader, Panel, Skeleton, StatusChip, inputCls } from "@/components/ui/kit";
+import { Button, CopyField, Field, Modal, Notice, PageHeader, Panel, Skeleton, StatusChip, inputCls, Pager } from "@/components/ui/kit";
 import { ApiError, api } from "@/lib/api";
 import { timeAgo, usdt } from "@/lib/format";
 import { useMerchantToken } from "@/lib/merchant-auth";
-import { useApi } from "@/lib/use-api";
+import { PAGE_SIZE, useApi, usePager } from "@/lib/use-api";
 
 function Qr({ url, size = 128 }: { url: string; size?: number }) {
   const [svg, setSvg] = useState<string | null>(null);
@@ -27,7 +27,8 @@ function Qr({ url, size = 128 }: { url: string; size?: number }) {
 
 export default function LinksPage() {
   const token = useMerchantToken();
-  const links = useApi((signal) => api("listPaymentLinks", { token, signal, query: { limit: 100 } }), [token]);
+  const pager = usePager();
+  const links = useApi((signal) => api("listPaymentLinks", { token, signal, query: { limit: PAGE_SIZE, cursor: pager.cursor } }), [token, pager.cursor]);
   const [creating, setCreating] = useState(false);
   const [showing, setShowing] = useState<PaymentLink | null>(null);
 
@@ -66,11 +67,14 @@ export default function LinksPage() {
             </Panel>
           ))}
         </div>
-      ) : (
+      ) : pager.page > 1 ? null : (
         <Panel>
           <p className="p-10 text-center text-[var(--color-muted)]">No payment links yet.</p>
         </Panel>
       )}
+      <div className="mt-4 overflow-hidden rounded-xl border border-[var(--color-line)] bg-white empty:hidden">
+        <Pager page={pager.page} hasNext={Boolean(links.data?.nextCursor)} loading={links.loading} onPrev={pager.prev} onNext={() => links.data?.nextCursor && pager.next(links.data.nextCursor)} />
+      </div>
       {showing ? (
         <Modal title={showing.title} onClose={() => setShowing(null)}>
           <div className="flex flex-col items-center gap-3">

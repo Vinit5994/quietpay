@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import type { Subscription } from "@quietpay/shared";
-import { Button, Modal, Notice, PageHeader, Panel, Skeleton, StatusChip, Table } from "@/components/ui/kit";
+import { Button, Modal, Notice, PageHeader, Panel, Skeleton, StatusChip, Table, Pager } from "@/components/ui/kit";
 import { api } from "@/lib/api";
 import { intervalLabel, shortAddress, timeAgo, usdt } from "@/lib/format";
 import { useMerchantToken } from "@/lib/merchant-auth";
-import { useApi } from "@/lib/use-api";
+import { PAGE_SIZE, useApi, usePager } from "@/lib/use-api";
 
 const filters = [
   { id: undefined, label: "All" },
@@ -28,7 +28,8 @@ function NextCharge({ s }: { s: Subscription }) {
 export default function SubscriptionsPage() {
   const token = useMerchantToken();
   const [status, setStatus] = useState<(typeof filters)[number]["id"]>(undefined);
-  const subs = useApi((signal) => api("dashSubscriptions", { token, signal, query: { status, limit: 100 } }), [token, status], { pollMs: 4000 });
+  const pager = usePager();
+  const subs = useApi((signal) => api("dashSubscriptions", { token, signal, query: { status, limit: PAGE_SIZE, cursor: pager.cursor } }), [token, status, pager.cursor], { pollMs: pager.page === 1 ? 4000 : undefined });
   const [canceling, setCanceling] = useState<Subscription | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +59,10 @@ export default function SubscriptionsPage() {
             type="button"
             role="tab"
             aria-selected={status === f.id}
-            onClick={() => setStatus(f.id)}
+            onClick={() => {
+              setStatus(f.id);
+              pager.reset();
+            }}
             className={`rounded-full border border-[var(--color-line)] px-3 py-1 text-sm font-medium transition ${status === f.id ? "bg-[var(--color-accent)] text-[var(--color-accent-ink)] border-[var(--color-accent)]" : "bg-[var(--color-surface)] hover:bg-[var(--color-bg)]"}`}
           >
             {f.label}
@@ -100,6 +104,7 @@ export default function SubscriptionsPage() {
             ))}
           </Table>
         )}
+        <Pager page={pager.page} hasNext={Boolean(subs.data?.nextCursor)} loading={subs.loading} onPrev={pager.prev} onNext={() => subs.data?.nextCursor && pager.next(subs.data.nextCursor)} />
       </Panel>
       {canceling ? (
         <Modal title="Cancel subscription?" onClose={() => setCanceling(null)}>

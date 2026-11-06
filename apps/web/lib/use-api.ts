@@ -45,3 +45,18 @@ export function useApi<T>(load: (signal: AbortSignal) => Promise<T>, deps: unkno
 
   return { data, error, loading, reload: () => run() };
 }
+
+/** Cursor pagination state: a stack of cursors, one per page visited. */
+export function usePager() {
+  const [stack, setStack] = useState<(string | undefined)[]>([undefined]);
+  return {
+    cursor: stack[stack.length - 1],
+    page: stack.length,
+    next: (cursor: string) => setStack((s) => [...s, cursor]),
+    prev: () => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s)),
+    reset: () => setStack([undefined]),
+  };
+}
+
+/** Rows per page on dashboard lists. */
+export const PAGE_SIZE = 20;

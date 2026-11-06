@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Check, Code2, Layers, LayoutDashboard, LogOut, QrCode, Receipt, Repeat, Store } from "lucide-react";
+import { Check, Code2, Layers, LayoutDashboard, LogOut, Plug, QrCode, Receipt, Repeat, Store } from "lucide-react";
 import { BuiltWith } from "@/components/brand/BuiltWith";
 import { Logo } from "@/components/brand/Logo";
 import { Button, CopyField, Field, Notice, inputCls } from "@/components/ui/kit";
@@ -19,6 +19,7 @@ const nav = [
   { href: "/dashboard/subscriptions", label: "Subscriptions", icon: Repeat },
   { href: "/dashboard/plans", label: "Plans", icon: Layers },
   { href: "/dashboard/links", label: "Payment links", icon: QrCode },
+  { href: "/dashboard/integrate", label: "Integrate", icon: Plug },
   { href: "/dashboard/developers", label: "Developers", icon: Code2 },
 ];
 

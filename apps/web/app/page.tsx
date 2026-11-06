@@ -17,63 +17,12 @@ import {
 import { QUIETPAY_ADDRESS, explorerAddress } from "@quietpay/shared";
 import { BuiltWith } from "@/components/brand/BuiltWith";
 import { Logo } from "@/components/brand/Logo";
-import { CodeTabs, type CodeTab } from "@/components/landing/CodeTabs";
+import { CodeTabs } from "@/components/landing/CodeTabs";
+import { integrationSnippets } from "@/components/landing/snippets";
 
 const demoStoreUrl = process.env.NEXT_PUBLIC_DEMO_STORE_URL ?? "http://localhost:3002";
 
-const tabs: CodeTab[] = [
-  {
-    id: "checkout",
-    file: "checkout.ts",
-    code: `import { QuietPay } from "@quietpay/node";
-
-const qp = new QuietPay(process.env.QUIETPAY_SECRET_KEY!);
-
-// On your server: create a checkout and send the customer to it
-export async function checkout(order: Order) {
-  const session = await qp.checkout.sessions.create({
-    mode: "payment",
-    reference: order.id,
-    lineItems: order.lineItems, // name, unitAmount, quantity
-    successUrl: \`https://yourstore.com/orders/\${order.id}\`,
-    cancelUrl: "https://yourstore.com/cart",
-  });
-  redirect(session.url);
-}`,
-  },
-  {
-    id: "webhook",
-    file: "webhook.ts",
-    code: `// app/api/webhooks/quietpay/route.ts
-export async function POST(req: Request) {
-  const event = qp.webhooks.verify(
-    await req.text(),
-    req.headers.get("quietpay-signature"),
-    process.env.QUIETPAY_WEBHOOK_SECRET!,
-  );
-
-  if (event.type === "payment.succeeded") {
-    await markPaid(event.data.merchantReference, event.data.txHash);
-  }
-  return Response.json({ received: true });
-}`,
-  },
-  {
-    id: "subscription",
-    file: "subscription.ts",
-    code: `// Same call, subscription mode: renewals, grace period and cancels are handled for you
-const session = await qp.checkout.sessions.create({
-  mode: "subscription",
-  planId: process.env.QUIETPAY_PLAN_ID!,
-  reference: customer.id,
-  successUrl: "https://yourstore.com/account",
-  cancelUrl: "https://yourstore.com/pricing",
-});
-redirect(session.url);
-
-// Then listen for subscription.renewed, subscription.payment_failed and subscription.canceled`,
-  },
-];
+const tabs = integrationSnippets;
 
 const flow = [
   { icon: Store, title: "Your store creates a checkout", body: "One SDK call with the order's items and your reference." },
@@ -101,7 +50,7 @@ const steps = [
 function SettlingWaves() {
   const lines = Array.from({ length: 7 }, (_, i) => i);
   return (
-    <svg className="pointer-events-none absolute inset-x-0 bottom-0 h-56 w-full" viewBox="0 0 1200 220" preserveAspectRatio="none" aria-hidden>
+    <svg className="pointer-events-none absolute inset-x-0 bottom-0 h-28 w-full" viewBox="0 0 1200 220" preserveAspectRatio="none" aria-hidden>
       {lines.map((i) => {
         const y = 70 + i * 20;
         const a = 46 - i * 6;
@@ -166,7 +115,7 @@ export default function Home() {
           </nav>
         </header>
 
-        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 pb-24 pt-12 sm:px-6 sm:pt-16 lg:grid-cols-[1fr_1.05fr]">
+        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 pb-32 pt-12 sm:px-6 sm:pt-16 lg:grid-cols-[1fr_1.05fr]">
           <div>
             <h1 className="text-[2.6rem] font-semibold leading-[1.05] sm:text-6xl">Get paid in USDT without the crypto noise.</h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/75">
