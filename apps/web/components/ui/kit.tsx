@@ -68,10 +68,16 @@ export function Stat({ label, value, hint, tone }: { label: string; value: React
   return (
     <div className={`min-w-0 rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] p-4 shadow-[var(--shadow-brutal)] ${tone === "warn" ? "bg-[var(--color-warn-soft)]" : "bg-[var(--color-surface)]"}`}>
       <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-muted)]">{label}</p>
-      <p className="tabular mt-1.5 truncate font-[family-name:var(--font-display)] text-3xl font-bold">{value}</p>
+      <p className={`tabular mt-1.5 break-words font-[family-name:var(--font-display)] font-bold leading-tight ${valueSize(value)}`}>{value}</p>
       {hint ? <p className="mt-1 text-xs text-[var(--color-muted)]">{hint}</p> : null}
     </div>
   );
+}
+
+/** Long amounts ("324,000.00 USDT") step down a size instead of being cut off. */
+function valueSize(value: React.ReactNode) {
+  const len = typeof value === "string" ? value.length : 0;
+  return len > 16 ? "text-xl" : len > 12 ? "text-2xl" : "text-3xl";
 }
 
 export function Notice({ tone = "info", children }: { tone?: "info" | "warn" | "bad" | "good"; children: React.ReactNode }) {

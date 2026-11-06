@@ -20,7 +20,7 @@ export default function OverviewPage() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Volume, 24h" value={o ? usdt(o.volume24h) : "…"} hint={o ? `${o.paymentsCount} payments in total` : undefined} />
         <Stat label="Volume, 7 days" value={o ? usdt(o.volume7d) : "…"} />
-        <Stat label="MRR" value={o ? usdt(o.mrr) : "…"} hint={o ? `${o.activeSubscriptions} active subscriptions` : undefined} />
+        <Stat label="MRR" value={o ? usdt(o.mrr) : "…"} hint={o ? `${o.activeSubscriptions} active subscriptions · projected over 30 days` : undefined} />
         <Stat
           label="Past due"
           value={o ? o.pastDueSubscriptions : "…"}
