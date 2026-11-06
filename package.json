@@ -17,9 +17,11 @@
     "fix:lockfile": "bash scripts/fix-lockfile.sh",
     "abi:export": "tsx scripts/export-abi.ts",
     "first-payment": "tsx scripts/first-payment.ts",
-    "pay-session": "tsx scripts/pay-session.ts"
+    "pay-session": "tsx scripts/pay-session.ts",
+    "webhook-receiver": "tsx scripts/webhook-receiver.ts"
   },
   "devDependencies": {
+    "@quietpay/node": "workspace:*",
     "@quietpay/shared": "workspace:*",
     "@types/node": "^22.15.0",
     "tsx": "^4.20.0",
