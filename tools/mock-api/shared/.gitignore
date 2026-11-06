@@ -1,0 +1,3 @@
+node_modules
+# temporary standalone lockfile until Person A's root workspace (A1) lands
+pnpm-lock.yaml
