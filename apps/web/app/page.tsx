@@ -6,6 +6,7 @@ import {
   FileSpreadsheet,
   Fuel,
   KeyRound,
+  Lock,
   Mail,
   QrCode,
   Repeat,
@@ -16,8 +17,9 @@ import {
 } from "lucide-react";
 import { QUIETPAY_ADDRESS, explorerAddress } from "@quietpay/shared";
 import { BuiltWith } from "@/components/brand/BuiltWith";
-import { Logo } from "@/components/brand/Logo";
+import { Logo, LogoMark } from "@/components/brand/Logo";
 import { CodeTabs } from "@/components/landing/CodeTabs";
+import { CopyCode } from "@/components/landing/CopyCode";
 import { integrationSnippets } from "@/components/landing/snippets";
 
 const demoStoreUrl = process.env.NEXT_PUBLIC_DEMO_STORE_URL ?? "http://localhost:3002";
@@ -72,12 +74,15 @@ function SettlingWaves() {
 function MiniCheckout() {
   return (
     <div className="mx-auto w-full max-w-[300px] rounded-xl border border-[var(--color-line)] bg-white p-4 shadow-[var(--shadow-pop)]">
-      <div className="flex items-center gap-2.5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-neutral-soft)] text-sm font-semibold">S</span>
-        <div>
-          <p className="text-xs text-[var(--color-muted)]">Pay</p>
-          <p className="text-sm font-semibold">Swag Counter</p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--color-neutral-soft)] text-sm font-semibold">S</span>
+          <div>
+            <p className="text-xs text-[var(--color-muted)]">Pay</p>
+            <p className="text-sm font-semibold">Swag Counter</p>
+          </div>
         </div>
+        <LogoMark size={22} />
       </div>
       <div className="mt-4 space-y-2 text-sm">
         <div className="flex justify-between"><span>Builder Hoodie</span><span className="tabular">25.00 USDT</span></div>
@@ -90,6 +95,9 @@ function MiniCheckout() {
       <div className="mt-4 flex h-10 items-center justify-center rounded-lg bg-[var(--color-pine)] text-sm font-medium text-white">Pay 37.00 USDT</div>
       <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-[var(--color-muted)]">
         <Check className="h-3.5 w-3.5 text-[var(--color-brand)]" aria-hidden /> No network fee for you
+      </p>
+      <p className="mt-3 flex items-center justify-center gap-1.5 border-t border-[var(--color-line)] pt-3 text-xs text-[var(--color-muted)]">
+        <Lock className="h-3 w-3" aria-hidden /> Secure checkout by <LogoMark size={14} /> <span className="font-semibold text-[var(--color-ink)]">QuietPay</span>
       </p>
     </div>
   );
@@ -203,7 +211,11 @@ export default function Home() {
                 </div>
                 <h3 className="mt-5 text-lg font-semibold">{s.title}</h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-[var(--color-muted)]">{s.body}</p>
-                {s.code ? <code className="mt-4 block rounded-lg bg-[#06261d] px-3 py-2 font-mono text-xs text-[#e6f0ec]">{s.code}</code> : null}
+                {s.code ? (
+                  <div className="mt-4">
+                    <CopyCode code={s.code} />
+                  </div>
+                ) : null}
               </li>
             ))}
           </ol>
