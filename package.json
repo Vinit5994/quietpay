@@ -10,15 +10,19 @@
     "dev:web": "pnpm --filter @quietpay/web dev",
     "dev:store": "pnpm --filter @swag-counter/store dev",
     "dev:mock": "pnpm --filter @quietpay/mock-api dev",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm -r typecheck && tsc -p scripts/tsconfig.json",
     "test": "pnpm -r --filter '!@quietpay/contracts' test",
     "test:contracts": "pnpm --filter @quietpay/contracts test",
     "check:ownership": "bash scripts/check-ownership.sh",
-    "fix:lockfile": "bash scripts/fix-lockfile.sh"
+    "fix:lockfile": "bash scripts/fix-lockfile.sh",
+    "abi:export": "tsx scripts/export-abi.ts",
+    "first-payment": "tsx scripts/first-payment.ts"
   },
   "devDependencies": {
+    "@quietpay/shared": "workspace:*",
     "@types/node": "^22.15.0",
     "tsx": "^4.20.0",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "viem": "^2.57.16"
   }
 }
