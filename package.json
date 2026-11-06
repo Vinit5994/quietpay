@@ -18,7 +18,9 @@
     "abi:export": "tsx scripts/export-abi.ts",
     "first-payment": "tsx scripts/first-payment.ts",
     "pay-session": "tsx scripts/pay-session.ts",
-    "webhook-receiver": "tsx scripts/webhook-receiver.ts"
+    "webhook-receiver": "tsx scripts/webhook-receiver.ts",
+    "subscription-demo": "tsx scripts/subscription-demo.ts",
+    "refund-demo": "tsx scripts/refund-demo.ts"
   },
   "devDependencies": {
     "@quietpay/node": "workspace:*",
