@@ -76,9 +76,8 @@ function Portal({ token, onExpired }: { token: string; onExpired: () => void }) 
   const [canceling, setCanceling] = useState<Sub | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  if (portal.loading && !portal.data) return <Panel><Skeleton rows={4} /></Panel>;
-  if (portal.error && !portal.data) return <Notice tone="bad">{portal.error}</Notice>;
-  const data = portal.data!;
+  const data = portal.data;
+  if (!data) return portal.error ? <Notice tone="bad">{portal.error}</Notice> : <Panel><Skeleton rows={4} /></Panel>;
 
   return (
     <div className="space-y-6">

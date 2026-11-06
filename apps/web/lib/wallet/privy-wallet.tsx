@@ -21,7 +21,7 @@ export function PrivyWalletProvider({ appId, children }: { appId: string; childr
         embeddedWallets: { ethereum: { createOnLogin: "users-without-wallets" } },
         defaultChain: whitechainSepolia,
         supportedChains: [whitechainSepolia],
-        appearance: { landingHeader: "Pay with QuietPay", showWalletLoginFirst: false },
+        appearance: { landingHeader: "Sign in to QuietPay", showWalletLoginFirst: false },
       }}
     >
       <PrivyAdapter>{children}</PrivyAdapter>
