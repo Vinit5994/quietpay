@@ -15,6 +15,7 @@
     "@solana-program/system": "0.16.0",
     "@solana-program/token": "0.16.1",
     "@solana/kit": "8.6.0",
+    "lucide-react": "0.511.0",
     "next": "^15.3.0",
     "qrcode": "^1.5.4",
     "react": "^19.1.0",

@@ -21,29 +21,31 @@ export function CodeTabs({ tabs }: { tabs: CodeTab[] }) {
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[#26262b] bg-[#111113] shadow-[var(--shadow-pop)]">
-      <div className="flex items-center justify-between gap-3 border-b border-[#26262b] px-2">
+    <div className="overflow-hidden rounded-xl border border-white/10 bg-[#06261d] shadow-[var(--shadow-pop)]">
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-2">
         <div role="tablist" aria-label="Integration code" className="flex overflow-x-auto">
           {tabs.map((t) => (
             <button
               key={t.id}
               type="button"
               role="tab"
+              id={`tab-${t.id}`}
+              aria-controls="code-panel"
               aria-selected={t.id === active}
               onClick={() => setActive(t.id)}
               className={`whitespace-nowrap border-b-2 px-3 py-2.5 font-mono text-xs transition-colors ${
-                t.id === active ? "border-[#34d399] text-white" : "border-transparent text-[#8b8b93] hover:text-white"
+                t.id === active ? "border-[#26a17b] text-white" : "border-transparent text-white/50 hover:text-white"
               }`}
             >
               {t.file}
             </button>
           ))}
         </div>
-        <button type="button" onClick={copy} className="shrink-0 rounded-md px-2 py-1 text-xs text-[#8b8b93] hover:bg-white/5 hover:text-white">
+        <button type="button" onClick={copy} className="shrink-0 rounded-md px-2 py-1 text-xs text-white/50 hover:bg-white/5 hover:text-white">
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
-      <pre className="overflow-x-auto p-4 font-mono text-[12.5px] leading-6 text-[#e4e4e7]" role="tabpanel">
+      <pre className="overflow-x-auto p-4 font-mono text-[12.5px] leading-6 text-[#e6f0ec]" role="tabpanel" id="code-panel" aria-labelledby={`tab-${tab.id}`} translate="no">
         <code>{highlight(tab.code)}</code>
       </pre>
     </div>
@@ -58,7 +60,7 @@ function highlight(code: string) {
   for (const m of code.matchAll(TOKEN)) {
     const i = m.index ?? 0;
     if (i > last) out.push(code.slice(last, i));
-    const cls = m[1] ? "text-[#6b6b74]" : m[2] ? "text-[#86efac]" : "text-[#c4b5fd]";
+    const cls = m[1] ? "text-[#6f8f84]" : m[2] ? "text-[#7ee2b8]" : "text-[#f2b544]";
     out.push(
       <span key={i} className={cls}>
         {m[0]}

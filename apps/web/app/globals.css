@@ -1,38 +1,53 @@
 @import "tailwindcss";
 
-/* QuietPay design tokens: calm, neutral fintech look. Black primary actions, one green brand accent. */
+/*
+ * QuietPay tokens. Pine and USDT green on a cool paper background.
+ * The brand idea: "quiet" = a sound wave that settles into a flat line (see components/brand/Logo.tsx).
+ */
 @theme {
-  --color-bg: #f7f7f8;
+  --color-bg: #f5f8f6;
   --color-surface: #ffffff;
-  --color-ink: #0b0b0c;
-  --color-muted: #6b6f76;
-  --color-line: #e6e6e9;
-  --color-line-strong: #d4d4d8;
-  /* Primary action colour (buttons, active states) */
-  --color-accent: #0b0b0c;
+  --color-ink: #13221d;
+  --color-muted: #5e6b66;
+  --color-line: #dce4e0;
+  --color-line-strong: #c6d2cc;
+  /* Primary actions */
+  --color-accent: #0b3b2e;
+  --color-accent-hover: #0f4c3b;
   --color-accent-ink: #ffffff;
-  /* Brand: USDT green, used sparingly (logo, highlights, links) */
-  --color-brand: #0c8a5f;
-  --color-brand-soft: #e8f5ef;
-  --color-link: #0c7a55;
-  --color-good: #0c7a55;
-  --color-warn: #9a5b00;
-  --color-bad: #c4302b;
-  --color-good-soft: #e8f5ef;
-  --color-warn-soft: #fdf3e1;
-  --color-bad-soft: #fdeceb;
-  --color-info-soft: #eef1f8;
-  --color-neutral-soft: #f1f1f3;
+  /* Brand */
+  --color-pine: #0b3b2e;
+  --color-pine-2: #114a3a;
+  --color-brand: #26a17b;
+  --color-brand-soft: #e4f3ec;
+  --color-link: #127a57;
+  /* Status */
+  --color-good: #127a57;
+  --color-warn: #8a5a00;
+  --color-bad: #b42a25;
+  --color-good-soft: #e4f3ec;
+  --color-warn-soft: #fdf1d8;
+  --color-bad-soft: #fbe9e7;
+  --color-info-soft: #eaf0ee;
+  --color-neutral-soft: #eef2f0;
+  --color-amber: #f2b544;
 
   --radius-base: 10px;
-  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.05);
-  --shadow-pop: 0 1px 2px rgb(16 24 40 / 0.04), 0 16px 40px -12px rgb(16 24 40 / 0.18);
+  --shadow-card: 0 1px 2px rgb(11 59 46 / 0.05), 0 1px 3px rgb(11 59 46 / 0.06);
+  --shadow-pop: 0 1px 2px rgb(11 59 46 / 0.05), 0 18px 44px -14px rgb(11 59 46 / 0.28);
 
   --font-sans: var(--font-body), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-heading), var(--font-body), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-code), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 html, body { background: var(--color-bg); color: var(--color-ink); }
-h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; }
+h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; text-wrap: balance; }
+html { color-scheme: light; -webkit-tap-highlight-color: transparent; }
+a, button, [role="tab"] { touch-action: manipulation; }
+/* Visible keyboard focus everywhere, without showing it on mouse clicks */
+:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; border-radius: 6px; }
+.skip-link { position: absolute; left: 1rem; top: -3rem; z-index: 50; background: #fff; color: var(--color-ink); padding: 0.5rem 0.75rem; border-radius: 8px; }
+.skip-link:focus { top: 1rem; }
 .tabular { font-variant-numeric: tabular-nums; }
+::selection { background: var(--color-brand-soft); }

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Logo } from "@/components/brand/Logo";
 import { useState } from "react";
 import type { PortalResponse } from "@quietpay/shared";
 import { Button, Modal, Notice, Panel, Skeleton, StatusChip } from "@/components/ui/kit";
@@ -17,7 +18,7 @@ export default function PortalPage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-10">
-      <p className="text-sm font-semibold text-[var(--color-brand)]">QuietPay</p>
+      <Link href="/" aria-label="QuietPay home"><Logo size={26} /></Link>
       <h1 className="mt-1 text-2xl font-semibold">Your payments</h1>
       <p className="mt-1 text-sm text-[var(--color-muted)]">Subscriptions and receipts for everything you paid with QuietPay.</p>
 

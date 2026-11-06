@@ -8,6 +8,8 @@ import type { Phase } from "@/lib/checkout/machine";
 import { useCheckout } from "@/lib/checkout/useCheckout";
 import type { Wallet } from "@/lib/wallet";
 import { buttonCls } from "@/components/ui/kit";
+import { LogoMark } from "@/components/brand/Logo";
+import { Lock } from "lucide-react";
 
 /** "1234.5" → "1,234.50 USDT" */
 const formatUsdt = (amount: string) => formatUsdtBase(amount).replace(/\B(?=(\d{3})+(?!\d))(?=[\d,]*\.)/g, ",");
@@ -26,7 +28,7 @@ export function Checkout({ sessionId }: { sessionId: string }) {
         <Body phase={phase} wallet={wallet} pay={pay} />
       </section>
       <p className="mt-8 flex items-center justify-center gap-2 text-xs font-medium text-[var(--color-muted)]">
-        <BrandMark /> Secure checkout by <span className="font-semibold text-[var(--color-ink)]">QuietPay</span> · paid in USDT
+        <Lock className="h-3.5 w-3.5" aria-hidden /> Secure checkout by <LogoMark size={16} /> <span className="font-semibold text-[var(--color-ink)]">QuietPay</span>
       </p>
     </main>
   );
@@ -350,11 +352,3 @@ const primaryBtn = buttonCls("primary", "lg");
 const secondaryBtn = buttonCls("secondary", "md");
 const linkCls = "text-sm font-semibold text-[var(--color-link)] underline decoration-1 underline-offset-2 hover:decoration-[var(--color-link)]";
 
-/** Small QuietPay mark. */
-function BrandMark() {
-  return (
-    <span className="inline-flex h-4 w-4 items-center justify-center rounded-[4px] bg-[var(--color-brand)] text-[9px] font-semibold text-white" aria-hidden>
-      Q
-    </span>
-  );
-}
