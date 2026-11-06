@@ -94,14 +94,14 @@ function NewPlan({ token, onClose, onCreated }: { token: string; onClose: () => 
           <legend className="text-sm font-medium">Billing</legend>
           <div className="mt-1 flex gap-2">
             {(["month", "week"] as const).map((i) => (
-              <label key={i} className={`flex-1 cursor-pointer rounded-lg border px-3 py-2 text-center text-sm ${interval === i && !demo ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10" : "border-[var(--color-line)]"}`}>
+              <label key={i} className={`flex-1 cursor-pointer rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] px-3 py-2 text-center text-sm font-bold ${interval === i && !demo ? "bg-[var(--color-accent)] shadow-[var(--shadow-brutal-sm)]" : "bg-[var(--color-surface)]"}`}>
                 <input type="radio" name="interval" className="sr-only" checked={interval === i} onChange={() => setInterval(i)} />
                 Every {i}
               </label>
             ))}
           </div>
         </fieldset>
-        <label className="flex items-start gap-3 rounded-lg bg-[var(--color-bg)] p-3 text-sm">
+        <label className="flex items-start gap-3 rounded-[var(--radius-base)] border-2 border-dashed border-[var(--color-ink)]/40 bg-[var(--color-bg)] p-3 text-sm">
           <input id="plan-demo" type="checkbox" checked={demo} onChange={(e) => setDemo(e.target.checked)} className="mt-0.5" />
           <span>
             <span className="font-medium">Demo: renew every 2 minutes</span>

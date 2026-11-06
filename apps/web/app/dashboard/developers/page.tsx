@@ -153,7 +153,7 @@ export default function DevelopersPage() {
           <p className="mb-2 text-xs text-[var(--color-muted)]">
             {viewing.eventId} → {viewing.url}
           </p>
-          <pre className="max-h-[60vh] overflow-auto rounded-lg bg-[var(--color-bg)] p-3 font-mono text-xs">{JSON.stringify(viewing.payload, null, 2)}</pre>
+          <pre className="max-h-[60vh] overflow-auto rounded-[var(--radius-base)] border-2 border-dashed border-[var(--color-ink)]/40 bg-[var(--color-bg)] p-3 font-mono text-xs">{JSON.stringify(viewing.payload, null, 2)}</pre>
         </Modal>
       ) : null}
 

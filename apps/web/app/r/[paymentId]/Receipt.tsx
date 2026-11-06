@@ -11,7 +11,7 @@ export function Receipt({ paymentId }: { paymentId: string }) {
 
   return (
     <main className="mx-auto w-full max-w-lg px-4 py-10 print:py-0">
-      <article className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6 shadow-sm print:border-0 print:shadow-none">
+      <article className="rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] bg-[var(--color-surface)] p-6 shadow-[var(--shadow-brutal-lg)] print:border-0 print:shadow-none">
         {receipt.error && !r ? (
           <Notice tone="bad">{receipt.error.includes("not") ? "We couldn't find this receipt. Check the link and try again." : receipt.error}</Notice>
         ) : !r ? (
@@ -65,7 +65,7 @@ export function Receipt({ paymentId }: { paymentId: string }) {
               ) : null}
             </dl>
 
-            <dl className="mt-6 grid grid-cols-2 gap-3 rounded-lg bg-[var(--color-bg)] p-3 text-xs">
+            <dl className="mt-6 grid grid-cols-2 gap-3 rounded-[var(--radius-base)] border-2 border-dashed border-[var(--color-ink)]/40 bg-[var(--color-bg)] p-3 text-xs">
               <div>
                 <dt className="text-[var(--color-muted)]">{r.kind === "subscription" ? "Subscription" : "Order"}</dt>
                 <dd className="mt-0.5 break-all font-mono">{r.planName ?? r.reference ?? "—"}</dd>

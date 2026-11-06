@@ -49,7 +49,7 @@ export function FundDemo({ returnTo }: { returnTo?: string }) {
             Sent {state.amount} test USDT to your wallet. <TxLink hash={state.txHash} />
           </Notice>
           {back ? (
-            <a href={back} className="inline-flex w-full justify-center rounded-lg bg-[var(--color-accent)] px-4 py-3 font-medium text-[var(--color-accent-ink)]">
+            <a href={back} className="nb-press inline-flex items-center justify-center rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] bg-[var(--color-accent)] font-bold text-[var(--color-ink)] w-full px-4 py-3">
               Back to checkout
             </a>
           ) : null}

@@ -5,27 +5,18 @@ import { explorerTx } from "@quietpay/shared";
 
 /* Small UI kit for the QuietPay web app. Tokens live in app/globals.css. */
 
-type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" | "ghost"; size?: "sm" | "md" };
+type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" | "ghost"; size?: "sm" | "md" | "lg" };
 
 export function Button({ variant = "primary", size = "md", className = "", ...props }: ButtonProps) {
-  const base =
-    "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60";
-  const sizes = { sm: "px-3 py-1.5 text-sm", md: "px-4 py-2.5" };
-  const variants = {
-    primary: "bg-[var(--color-accent)] text-[var(--color-accent-ink)] hover:opacity-90",
-    secondary: "border border-[var(--color-line)] bg-[var(--color-surface)] hover:bg-[var(--color-bg)]",
-    danger: "border border-[var(--color-bad)]/40 bg-[var(--color-surface)] text-[var(--color-bad)] hover:bg-[var(--color-bad)]/10",
-    ghost: "text-[var(--color-muted)] hover:text-[var(--color-ink)]",
-  };
-  return <button type="button" className={`${base} ${sizes[size]} ${variants[variant]} ${className}`} {...props} />;
+  return <button type="button" className={`${buttonCls(variant, size)} ${className}`} {...props} />;
 }
 
 export function Panel({ title, action, children, className = "" }: { title?: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
-    <section className={`rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] ${className}`}>
+    <section className={`rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] bg-[var(--color-surface)] shadow-[var(--shadow-brutal)] ${className}`}>
       {title || action ? (
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-line)] px-5 py-3.5">
-          {title ? <h2 className="font-semibold">{title}</h2> : <span />}
+        <header className="flex flex-wrap items-center justify-between gap-3 rounded-t-[calc(var(--radius-base)-2px)] border-b-2 border-[var(--color-ink)] bg-[var(--color-accent)]/35 px-5 py-3">
+          {title ? <h2 className="text-base font-bold">{title}</h2> : <span />}
           {action}
         </header>
       ) : null}
@@ -38,32 +29,36 @@ export function PageHeader({ title, description, action }: { title: string; desc
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        {description ? <p className="mt-1 max-w-prose text-sm text-[var(--color-muted)]">{description}</p> : null}
+        <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
+        {description ? <p className="mt-1.5 max-w-prose text-sm text-[var(--color-muted)]">{description}</p> : null}
       </div>
       {action}
     </div>
   );
 }
 
+const good = "bg-[var(--color-good-soft)]";
+const warn = "bg-[var(--color-warn-soft)]";
+const bad = "bg-[var(--color-bad-soft)]";
+const neutral = "bg-[var(--color-neutral-soft)]";
 const chipStyles: Record<string, { cls: string; label: string }> = {
-  paid: { cls: "bg-[var(--color-good)]/12 text-[var(--color-good)]", label: "Paid" },
-  partially_refunded: { cls: "bg-[var(--color-warn)]/12 text-[var(--color-warn)]", label: "Partially refunded" },
-  refunded: { cls: "bg-[var(--color-muted)]/15 text-[var(--color-muted)]", label: "Refunded" },
-  active: { cls: "bg-[var(--color-good)]/12 text-[var(--color-good)]", label: "Active" },
-  past_due: { cls: "bg-[var(--color-warn)]/12 text-[var(--color-warn)]", label: "Past due" },
-  canceled: { cls: "bg-[var(--color-muted)]/15 text-[var(--color-muted)]", label: "Canceled" },
-  succeeded: { cls: "bg-[var(--color-good)]/12 text-[var(--color-good)]", label: "Delivered" },
-  pending: { cls: "bg-[var(--color-warn)]/12 text-[var(--color-warn)]", label: "Retrying" },
-  failed: { cls: "bg-[var(--color-bad)]/12 text-[var(--color-bad)]", label: "Failed" },
-  inactive: { cls: "bg-[var(--color-muted)]/15 text-[var(--color-muted)]", label: "Off" },
+  paid: { cls: good, label: "Paid" },
+  partially_refunded: { cls: warn, label: "Partially refunded" },
+  refunded: { cls: neutral, label: "Refunded" },
+  active: { cls: good, label: "Active" },
+  past_due: { cls: warn, label: "Past due" },
+  canceled: { cls: neutral, label: "Canceled" },
+  succeeded: { cls: good, label: "Delivered" },
+  pending: { cls: warn, label: "Retrying" },
+  failed: { cls: bad, label: "Failed" },
+  inactive: { cls: neutral, label: "Off" },
 };
 
 export function StatusChip({ status, label }: { status: string; label?: string }) {
-  const s = chipStyles[status] ?? { cls: "bg-[var(--color-muted)]/15 text-[var(--color-muted)]", label: status };
+  const s = chipStyles[status] ?? { cls: neutral, label: status };
   return (
-    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${s.cls}`}>
-      <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border-2 border-[var(--color-ink)] px-2 py-0.5 text-xs font-bold text-[var(--color-ink)] ${s.cls}`}>
+      <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-ink)]" aria-hidden />
       {label ?? s.label}
     </span>
   );
@@ -71,9 +66,9 @@ export function StatusChip({ status, label }: { status: string; label?: string }
 
 export function Stat({ label, value, hint, tone }: { label: string; value: React.ReactNode; hint?: React.ReactNode; tone?: "warn" }) {
   return (
-    <div className="min-w-0 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">{label}</p>
-      <p className={`tabular mt-1.5 truncate text-2xl font-semibold ${tone === "warn" ? "text-[var(--color-warn)]" : ""}`}>{value}</p>
+    <div className={`min-w-0 rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] p-4 shadow-[var(--shadow-brutal)] ${tone === "warn" ? "bg-[var(--color-warn-soft)]" : "bg-[var(--color-surface)]"}`}>
+      <p className="text-xs font-bold uppercase tracking-wider text-[var(--color-muted)]">{label}</p>
+      <p className="tabular mt-1.5 truncate font-[family-name:var(--font-display)] text-3xl font-bold">{value}</p>
       {hint ? <p className="mt-1 text-xs text-[var(--color-muted)]">{hint}</p> : null}
     </div>
   );
@@ -81,13 +76,13 @@ export function Stat({ label, value, hint, tone }: { label: string; value: React
 
 export function Notice({ tone = "info", children }: { tone?: "info" | "warn" | "bad" | "good"; children: React.ReactNode }) {
   const tones = {
-    info: "border-[var(--color-line)] bg-[var(--color-bg)]",
-    warn: "border-[var(--color-warn)]/40 bg-[var(--color-warn)]/10",
-    bad: "border-[var(--color-bad)]/40 bg-[var(--color-bad)]/10",
-    good: "border-[var(--color-good)]/40 bg-[var(--color-good)]/10",
+    info: "bg-[var(--color-info-soft)]",
+    warn: "bg-[var(--color-warn-soft)]",
+    bad: "bg-[var(--color-bad-soft)]",
+    good: "bg-[var(--color-good-soft)]",
   };
   return (
-    <div role={tone === "bad" ? "alert" : "status"} className={`rounded-lg border p-3 text-sm ${tones[tone]}`}>
+    <div role={tone === "bad" ? "alert" : "status"} className={`rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] p-3 text-sm font-medium shadow-[var(--shadow-brutal-sm)] ${tones[tone]}`}>
       {children}
     </div>
   );
@@ -96,7 +91,7 @@ export function Notice({ tone = "info", children }: { tone?: "info" | "warn" | "
 export function TxLink({ hash, label = "View tx" }: { hash: string | null | undefined; label?: string }) {
   if (!hash) return <span className="text-[var(--color-muted)]">—</span>;
   return (
-    <a href={explorerTx(hash)} target="_blank" rel="noreferrer" className="whitespace-nowrap text-[var(--color-accent)] underline-offset-2 hover:underline">
+    <a href={explorerTx(hash)} target="_blank" rel="noreferrer" className="whitespace-nowrap font-semibold text-[var(--color-link)] underline decoration-2 underline-offset-2 hover:decoration-[var(--color-accent)]">
       {label} ↗
     </a>
   );
@@ -116,9 +111,9 @@ export function CopyField({ value, label, secret }: { value: string; label?: str
   };
   return (
     <div className="min-w-0">
-      {label ? <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">{label}</p> : null}
+      {label ? <p className="mb-1 text-xs font-bold uppercase tracking-wider text-[var(--color-muted)]">{label}</p> : null}
       <div className="flex min-w-0 items-center gap-2">
-        <code className="min-w-0 flex-1 select-all truncate rounded-md border border-[var(--color-line)] bg-[var(--color-bg)] px-2.5 py-1.5 font-mono text-xs">
+        <code className="min-w-0 flex-1 select-all truncate rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] bg-[var(--color-bg)] px-2.5 py-1.5 font-mono text-xs">
           {shown ? value : "•".repeat(Math.min(32, value.length))}
         </code>
         {secret ? (
@@ -144,13 +139,13 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-4 sm:items-center" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={id} className="w-full max-w-md rounded-2xl bg-[var(--color-surface)] p-5 shadow-xl">
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 p-4 sm:items-center" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={id} className="w-full max-w-md rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] bg-[var(--color-surface)] p-5 shadow-[var(--shadow-brutal-lg)]">
         <div className="flex items-start justify-between gap-4">
-          <h2 id={id} className="text-lg font-semibold">
+          <h2 id={id} className="text-xl font-bold">
             {title}
           </h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded p-1 text-[var(--color-muted)] hover:text-[var(--color-ink)]">
+          <button type="button" onClick={onClose} aria-label="Close" className="nb-press flex h-8 w-8 items-center justify-center rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] bg-[var(--color-surface)] text-sm font-bold">
             ✕
           </button>
         </div>
@@ -163,7 +158,7 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
 export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-sm font-medium">{label}</span>
+      <span className="text-sm font-bold">{label}</span>
       <div className="mt-1">{children}</div>
       {hint ? <span className="mt-1 block text-xs text-[var(--color-muted)]">{hint}</span> : null}
     </label>
@@ -171,22 +166,36 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 }
 
 export const inputCls =
-  "w-full rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 outline-none focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent)]/25";
+  "w-full rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] bg-[var(--color-surface)] px-3 py-2 font-medium outline-none transition-shadow placeholder:text-[var(--color-muted)]/70 focus:shadow-[var(--shadow-brutal-sm)] focus:bg-[var(--color-accent)]/10";
+
+/** Shared button look, also used by links styled as buttons. */
+export function buttonCls(variant: "primary" | "secondary" | "danger" | "ghost" = "primary", size: "sm" | "md" | "lg" = "md") {
+  const base =
+    "inline-flex items-center justify-center gap-2 rounded-[var(--radius-base)] text-center font-bold focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-link)] disabled:cursor-not-allowed disabled:opacity-60";
+  const sizes = { sm: "px-3 py-1.5 text-sm", md: "px-4 py-2.5", lg: "px-5 py-3.5 text-lg" };
+  const variants = {
+    primary: "nb-press border-2 border-[var(--color-ink)] bg-[var(--color-accent)] text-[var(--color-accent-ink)]",
+    secondary: "nb-press border-2 border-[var(--color-ink)] bg-[var(--color-surface)] text-[var(--color-ink)]",
+    danger: "nb-press border-2 border-[var(--color-ink)] bg-[var(--color-bad-soft)] text-[var(--color-ink)]",
+    ghost: "text-[var(--color-muted)] underline-offset-4 hover:text-[var(--color-ink)] hover:underline",
+  };
+  return `${base} ${sizes[size]} ${variants[variant]}`;
+}
 
 export function Table({ head, children, empty }: { head: string[]; children: React.ReactNode; empty?: string | false }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[640px] text-sm">
         <thead>
-          <tr className="border-b border-[var(--color-line)] text-left text-xs uppercase tracking-wide text-[var(--color-muted)]">
+          <tr className="border-b-2 border-[var(--color-ink)] bg-[var(--color-bg)] text-left text-xs uppercase tracking-wider">
             {head.map((h, i) => (
-              <th key={h || i} className={`px-5 py-2.5 font-medium ${h.startsWith(">") ? "text-right" : ""}`}>
+              <th key={h || i} className={`px-5 py-2.5 font-bold ${h.startsWith(">") ? "text-right" : ""}`}>
                 {h.replace(/^>/, "")}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[var(--color-line)]">
+        <tbody className="divide-y-2 divide-[var(--color-ink)]/10 [&>tr:hover]:bg-[var(--color-accent)]/15">
           {empty ? (
             <tr>
               <td colSpan={head.length} className="px-5 py-10 text-center text-[var(--color-muted)]">
@@ -206,7 +215,7 @@ export function Skeleton({ rows = 3 }: { rows?: number }) {
   return (
     <div className="space-y-3 p-5" aria-label="Loading">
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="h-4 animate-pulse rounded bg-[var(--color-line)]" style={{ width: `${85 - i * 12}%` }} />
+        <div key={i} className="h-4 animate-pulse rounded bg-[var(--color-ink)]/10" style={{ width: `${85 - i * 12}%` }} />
       ))}
     </div>
   );

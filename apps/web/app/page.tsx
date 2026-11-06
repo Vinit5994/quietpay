@@ -8,10 +8,10 @@ export default function Home() {
         Get paid in USDT on Whitechain: checkout, payment links, subscriptions and refunds. Nobody pays gas.
       </p>
       <div className="mt-8 flex flex-wrap gap-3">
-        <Link className="rounded-lg bg-[var(--color-accent)] px-4 py-2 font-medium text-[var(--color-accent-ink)]" href="/dashboard">
+        <Link className="nb-press inline-flex items-center justify-center rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] bg-[var(--color-accent)] font-bold text-[var(--color-ink)] px-4 py-2.5" href="/dashboard">
           Merchant dashboard
         </Link>
-        <Link className="rounded-lg border border-[var(--color-line)] px-4 py-2 font-medium" href="/portal">
+        <Link className="nb-press inline-flex items-center justify-center rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] bg-[var(--color-surface)] font-bold px-4 py-2.5" href="/portal">
           Customer portal
         </Link>
       </div>

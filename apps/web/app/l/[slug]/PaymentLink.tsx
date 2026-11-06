@@ -21,7 +21,7 @@ export function PaymentLink({ slug, paid }: { slug: string; paid: boolean }) {
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4 py-10 text-center">
-      <section className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6 shadow-sm" aria-live="polite">
+      <section className="rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] bg-[var(--color-surface)] p-6 shadow-[var(--shadow-brutal-lg)]" aria-live="polite">
         {paid ? (
           <>
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-good)]/15 text-[var(--color-good)]" aria-hidden>
@@ -36,7 +36,7 @@ export function PaymentLink({ slug, paid }: { slug: string; paid: boolean }) {
           <>
             <h1 className="text-lg font-semibold">Payment link unavailable</h1>
             <p className="mt-2 text-sm text-[var(--color-muted)]">{error}</p>
-            <button type="button" onClick={() => window.location.reload()} className="mt-5 rounded-lg border border-[var(--color-line)] px-4 py-2.5 font-medium">
+            <button type="button" onClick={() => window.location.reload()} className="mt-5 nb-press inline-flex items-center justify-center rounded-[var(--radius-base)] border-2 border-[var(--color-ink)] bg-[var(--color-surface)] font-bold px-4 py-2.5">
               Try again
             </button>
           </>

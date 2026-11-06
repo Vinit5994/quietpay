@@ -59,7 +59,7 @@ export default function SubscriptionsPage() {
             role="tab"
             aria-selected={status === f.id}
             onClick={() => setStatus(f.id)}
-            className={`rounded-full px-3 py-1 text-sm ${status === f.id ? "bg-[var(--color-accent)] text-[var(--color-accent-ink)]" : "border border-[var(--color-line)] hover:bg-[var(--color-surface)]"}`}
+            className={`rounded-full border-2 border-[var(--color-ink)] px-3 py-1 text-sm font-bold ${status === f.id ? "bg-[var(--color-accent)] shadow-[var(--shadow-brutal-sm)]" : "bg-[var(--color-surface)] hover:bg-[var(--color-accent)]/30"}`}
           >
             {f.label}
           </button>
