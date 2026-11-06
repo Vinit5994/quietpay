@@ -102,6 +102,23 @@ export class Relayer {
     return txHash;
   }
 
+  /**
+   * Relays and waits for the receipt (operator calls the API needs the result of, e.g. createPlan's planId).
+   * Rejects if the tx reverts on-chain.
+   */
+  async relayAndWait(req: Omit<RelayRequest, "onReceipt" | "onError">): Promise<{ txHash: Hex; receipt: TxReceipt }> {
+    return new Promise((resolve, reject) => {
+      this.relay({
+        ...req,
+        onReceipt: (receipt, txHash) =>
+          receipt.status === "success"
+            ? resolve({ txHash, receipt })
+            : reject(new ApiError(500, "transaction_failed", `Transaction ${txHash} reverted on-chain.`)),
+        onError: reject,
+      }).catch(reject);
+    });
+  }
+
   /** Receipt → relayer_txs + merchant gas_spent_wei → caller hook → 10. low-balance alert. */
   private async finish(req: RelayRequest, rtxId: string, txHash: Hex) {
     const { deps } = this;
