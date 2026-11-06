@@ -1,16 +1,20 @@
 "use client";
 
-import { DevWalletProvider, useDevWallet } from "./dev-wallet";
-import type { Wallet } from "./types";
+import { env } from "@/lib/env";
+import { DevWalletProvider } from "./dev-wallet";
+import { PrivyWalletProvider } from "./privy-wallet";
 
 export { SignatureRejectedError, type Wallet, type WalletStatus } from "./types";
 export type { TypedDataJson } from "./typed-data";
+export { useWallet } from "./context";
 
-/** Picks the wallet implementation. Privy (NEXT_PUBLIC_WALLET_MODE=privy) is added in task B4. */
+/**
+ * NEXT_PUBLIC_WALLET_MODE=privy (with NEXT_PUBLIC_PRIVY_APP_ID): email/Google + embedded wallet.
+ * Otherwise the browser demo wallet (also the fallback if Privy is unavailable).
+ */
 export function WalletProvider({ children }: { children: React.ReactNode }) {
+  if (env.walletMode === "privy" && env.privyAppId) {
+    return <PrivyWalletProvider appId={env.privyAppId}>{children}</PrivyWalletProvider>;
+  }
   return <DevWalletProvider>{children}</DevWalletProvider>;
-}
-
-export function useWallet(): Wallet {
-  return useDevWallet();
 }
