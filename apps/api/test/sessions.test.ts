@@ -74,13 +74,13 @@ describe("POST /v1/checkout/sessions", () => {
     expect(orderIdFromSessionId(a.body.id)).not.toBe(orderIdFromSessionId(b.body.id));
   });
 
-  it("does not accept subscription mode yet", async () => {
+  it("rejects a subscription session for an unknown plan", async () => {
     const { call, merchant } = setup();
     const res = await call("POST", "/v1/checkout/sessions", {
       body: { mode: "subscription", planId: "plan_x", reference: "box_1", successUrl: "http://s.test/a", cancelUrl: "http://s.test/b" },
       token: merchant.secretKey,
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(404);
   });
 });
 
