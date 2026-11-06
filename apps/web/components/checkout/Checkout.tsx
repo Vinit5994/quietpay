@@ -201,7 +201,9 @@ function InsufficientView({ phase, wallet, pay }: { phase: Extract<Phase, { name
 
 function SuccessView({ phase }: { phase: Extract<Phase, { name: "success" }> }) {
   const { session, status } = phase;
-  const redirect = status.redirectUrl;
+  // Payment links return to QuietPay's own home page; send the customer to their receipt instead.
+  const redirect = returnsToOwnHome(status.redirectUrl) ? (status.receiptUrl ?? status.redirectUrl) : status.redirectUrl;
+  const toReceipt = Boolean(redirect && redirect === status.receiptUrl);
   const [seconds, setSeconds] = useState(3);
 
   useEffect(() => {
@@ -227,7 +229,7 @@ function SuccessView({ phase }: { phase: Extract<Phase, { name: "success" }> }) 
         {formatUsdt(amount)} to {session.merchant.name}
       </p>
       <div className="mt-5 flex flex-col gap-2">
-        {status.receiptUrl ? (
+        {status.receiptUrl && !toReceipt ? (
           <a href={status.receiptUrl} className={secondaryBtn}>
             View receipt
           </a>
@@ -240,14 +242,25 @@ function SuccessView({ phase }: { phase: Extract<Phase, { name: "success" }> }) 
       </div>
       {redirect ? (
         <p className="mt-5 text-sm text-[var(--color-muted)]">
-          Returning to {session.merchant.name} in {Math.max(seconds, 0)}…{" "}
+          {toReceipt ? "Opening your receipt" : `Returning to ${session.merchant.name}`} in {Math.max(seconds, 0)}…{" "}
           <a href={redirect} className={linkCls}>
-            Return now
+            {toReceipt ? "Open now" : "Return now"}
           </a>
         </p>
       ) : null}
     </div>
   );
+}
+
+/** True when the session's success URL is this app's own home page (payment links). */
+function returnsToOwnHome(url: string | null | undefined) {
+  if (!url || typeof window === "undefined") return false;
+  try {
+    const u = new URL(url, window.location.href);
+    return u.origin === window.location.origin && (u.pathname === "/" || u.pathname === "");
+  } catch {
+    return false;
+  }
 }
 
 function ClosedView({ phase }: { phase: Extract<Phase, { name: "closed" }> }) {
