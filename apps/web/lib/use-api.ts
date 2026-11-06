@@ -15,15 +15,18 @@ export function useApi<T>(load: (signal: AbortSignal) => Promise<T>, deps: unkno
   loadRef.current = load;
 
   const run = useCallback(async (signal?: AbortSignal) => {
-    const ctrl = new AbortController();
+    const sig = signal ?? new AbortController().signal;
     try {
-      const result = await loadRef.current(signal ?? ctrl.signal);
+      const result = await loadRef.current(sig);
+      if (sig.aborted) return;
       setData(result);
       setError(null);
+      setLoading(false);
     } catch (err) {
-      if ((err as Error).name === "AbortError") return;
+      // A cancelled request (unmount, deps change, React dev double-run) must not end "loading",
+      // or the page would render with neither data nor error.
+      if (sig.aborted || (err as Error).name === "AbortError") return;
       setError(err instanceof ApiError || err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
       setLoading(false);
     }
   }, []);
