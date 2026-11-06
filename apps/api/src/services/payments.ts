@@ -21,7 +21,7 @@ export function recordCheckoutPayment(
     .insert(payments)
     .values({
       id,
-      onchainPaymentId: args.paymentId,
+      onchainPaymentId: args.paymentId.toLowerCase(),
       merchantId: session.merchantId,
       kind: "checkout",
       sessionId: session.id,
