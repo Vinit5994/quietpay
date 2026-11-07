@@ -126,12 +126,14 @@ The frontend in detail (pages, pop-up checkout, local setup): [`docs/readme/fron
 | Payment link (Sticker Pack QR, 3.00 USDT) | [0xca98…17c4](https://explorer.testnet.whitechain.io/tx/0xca989bc200392ebe34e1eae3be7e710272b7c9e994ec4b80639d42220d6317c4) |
 | Subscribe (Builder Box, first charge) | [0x7a12…9b4f](https://explorer.testnet.whitechain.io/tx/0x7a120ed88d71504530f03c835542527830535a0380b10813013c70b61afb9b4f) |
 | Automatic renewal (keeper) | [0x0007…5af0](https://explorer.testnet.whitechain.io/tx/0x000724492798b2977057cb784fdb91d44f66ea65d40f79606893f4cc28cc5af0) |
+| Failed renewal: wallet empty, subscription goes past due | [0xdb74…a087](https://explorer.testnet.whitechain.io/tx/0xdb7451f7190c5b21a9ab4ac7081d3750ab146c9dc41877d03e127fad3ed0a087) |
+| Canceled for nonpayment after the grace period (keeper) | [0x210d…c3f7](https://explorer.testnet.whitechain.io/tx/0x210db3a7b13ebc6d133d30bd7a0cfa121243e76524eee7c2262e84470b76c3f7) |
 | Customer cancel from the portal | [0xa77c…cb1e](https://explorer.testnet.whitechain.io/tx/0xa77c063d4e4bd49822f63182ed78ee4a58a42816eb89583a78e80d33d8a6cb1e) |
 | Partial refund (5.00 of 25.00) | [0x82ee…42d9](https://explorer.testnet.whitechain.io/tx/0x82eef7948b0fda1181af54a58fc77672d44ccf6db5965346609c1e9f7ffc42d9) |
 | Full refund (25.00 of 25.00; the contract then refuses any more) | [0x8358…0401](https://explorer.testnet.whitechain.io/tx/0x83588aa150a4f04b61b4305808fb1e9731495470b60ca55dcf2785695b3f0401) |
 | Pop-up checkout (Swag Counter → QuietPay window → Paid) | [0x6bc1…b7d6](https://explorer.testnet.whitechain.io/tx/0x6bc19c8cd267c91221c0e3b7b24a2c40b34567f6145219bf7ab58244e98fb7d6) |
 
-Failed renewal, cancel for nonpayment and more: [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
+Every flow with notes: [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
 
 ## Run it locally
 
