@@ -27,9 +27,6 @@ Specific notes from building QuietPay's web app, the hosted checkout and the Swa
 - **Plain EVM.** Privy embedded wallets, viem and EIP-712 signing worked on chain 1874 without any Whitechain-specific code once the chain was defined.
 
 ## What was hard or missing
-- **No way to get test USDT.** The faucet gives WBT only (0.5 WBT per GitHub account per day). For a payments track this is the main blocker: every demo customer needs USDT. *Workaround:* one teammate's wallet acted as a treasury and sent test USDT to demo wallets; we built a `/demo/fund` page on top of it. *Suggestion:* a USDT button on the faucet, or a documented mint/drip for the official test USDT.
-- **Whitechain Sepolia isn't in common chain lists** (viem's `chains`, Privy's supported chains, wallet presets). *Workaround:* `defineChain({ id: 1874, … })` in our shared package and Privy's custom-chain config. *Suggestion:* publish a copy-paste chain object (viem / wagmi / Privy) in the docs, including the explorer API URL.
-- **The test USDT's EIP-712 domain isn't documented.** We had to read `name()`, `version` and `DOMAIN_SEPARATOR()` on-chain and assert our computed separator matched before building signatures on it. *Suggestion:* list the domain (`Tether USD`, version `1`, chain 1874, proxy address) next to the token address.
 - **`eth_getLogs` range limits aren't documented.** We didn't know the maximum block range per call, so the admin panel reads events in 5,000-block chunks to stay safe. *Suggestion:* state the limit in the RPC docs.
 - **No brand or press kit.** whitechain.io serves its header logo at `/logo.svg`, but there's no linked brand kit with light/dark variants or usage rules. The logo is drawn for light backgrounds; turning it white for a dark hero flattens the mark. *Workaround:* we show it on a white chip in its real colours. *Suggestion:* a small brand page with SVGs for light and dark backgrounds.
 
