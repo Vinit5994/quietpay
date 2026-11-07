@@ -1,13 +1,12 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { createBox, setBox } from "@/lib/orders";
 import { BOX_COOKIE } from "@/lib/box-cookie";
 import { qp, STORE_URL } from "@/lib/quietpay";
 
 /** Starts a Builder Box subscription: QuietPay subscription checkout, reference = box id. */
-export async function subscribeToBox(): Promise<{ error: string }> {
+export async function subscribeToBox(): Promise<{ url: string } | { error: string }> {
   let url: string;
   try {
     const box = createBox();
@@ -25,5 +24,6 @@ export async function subscribeToBox(): Promise<{ error: string }> {
     console.error("[box]", err);
     return { error: "We couldn't start the subscription. Please try again in a moment." };
   }
-  redirect(url);
+  // The client opens this in a QuietPay pop-up (or redirects on phones).
+  return { url };
 }

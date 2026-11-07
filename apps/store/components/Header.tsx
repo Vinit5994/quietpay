@@ -2,6 +2,9 @@ import Link from "next/link";
 import { CartButton } from "./CartButton";
 import { Logo } from "./Logo";
 
+/** QuietPay's customer portal: receipts, subscriptions and cancelling, for shoppers. */
+const portalUrl = process.env.QUIETPAY_PORTAL_URL ?? "http://localhost:3001/portal";
+
 const links = [
   { href: "/#products", label: "Shop" },
   { href: "/box", label: "Builder Box", badge: "New" },
@@ -21,7 +24,15 @@ export function Header() {
           </Link>
         ))}
       </nav>
-      <CartButton />
+      <div className="flex items-center gap-2">
+        <a
+          href={portalUrl}
+          className="hidden rounded-full px-3.5 py-2 text-[15px] font-medium text-[var(--color-heading)] hover:text-[var(--color-violet)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] sm:inline-flex"
+        >
+          Your orders
+        </a>
+        <CartButton />
+      </div>
     </header>
   );
 }

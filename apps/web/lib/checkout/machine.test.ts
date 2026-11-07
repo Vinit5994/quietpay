@@ -154,4 +154,10 @@ describe("checkout machine", () => {
     ]);
     expect(p).toMatchObject({ name: "pay", busy: null, notice: "The payment was reverted." });
   });
+  it("never shows merchant gas wording to the customer", () => {
+    const paying = { name: "pay", session: session(), busy: "submitting", step: null, notice: null } as Phase;
+    const p = reducer(paying, { type: "failed", code: "merchant_gas_budget_exhausted", message: "This merchant's gas budget is used up (0 WBT left)." });
+    expect(p).toMatchObject({ name: "pay", notice: MESSAGES.merchantUnavailable });
+    expect(JSON.stringify(p)).not.toMatch(/WBT|gas/);
+  });
 });

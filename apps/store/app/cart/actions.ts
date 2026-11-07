@@ -1,10 +1,9 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { createOrder, setOrder, type CartItemInput } from "@/lib/orders";
 import { qp, STORE_URL } from "@/lib/quietpay";
 
-export async function checkout(items: CartItemInput[]): Promise<{ error: string }> {
+export async function checkout(items: CartItemInput[]): Promise<{ url: string } | { error: string }> {
   let url: string;
   try {
     const order = createOrder(items);
@@ -21,5 +20,6 @@ export async function checkout(items: CartItemInput[]): Promise<{ error: string 
     console.error("[checkout]", err);
     return { error: "We couldn't start the payment. Please try again in a moment." };
   }
-  redirect(url);
+  // The client opens this in a QuietPay pop-up (or redirects on phones).
+  return { url };
 }
