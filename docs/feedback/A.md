@@ -1,0 +1,10 @@
+# Whitechain feedback: contracts, API and chain (Person A)
+
+Notes from the contract, relayer and indexer side, taken from what the build needed (see `CLAUDE.md` fixed decisions and `docs/BUILD_PLAN.md` risks).
+
+- **Explorer verification needs an exact toolchain.** QuietPay only verifies on the Blockscout explorer with **solc 0.8.30 and `evm_version = prague`**, which we pinned in `foundry.toml` from the start. Foundry's defaults differ, so a newcomer following a generic Foundry guide can deploy fine and then fail verification. *Suggestion:* put the required compiler settings and a working `forge verify-contract … --verifier blockscout --verifier-url https://explorer.testnet.whitechain.io/api/` line on the "deploy a contract" page.
+- **The test USDT is a proxy.** `0xcedf…55a7` proxies to `TetherTokenV2`. The functions we need (`permit`, `receiveWithAuthorization`, `transferWithAuthorization`, each in `(v,r,s)` and `bytes signature` overloads) are only visible on the implementation. *Workaround:* read the implementation ABI and use the `bytes signature` overloads. *Suggestion:* document which standards the test USDT supports (EIP-2612, EIP-3009) and link the implementation.
+- **EIP-712 domain of the test USDT isn't written down.** We computed `{ name: "Tether USD", version: "1", chainId: 1874, verifyingContract: 0xcedf…55a7 }` and asserted it equals the on-chain `DOMAIN_SEPARATOR()` (`0xcdcf…2a25`) before building anything on it.
+- **Getting test USDT** for demo customers needed a workaround (the faucet gives WBT only). We kept one funded wallet as a demo treasury.
+- **Relayer gas.** The faucet's 0.5 WBT per GitHub account per day is enough for development, but a relayer that pays gas for every customer and merchant action burns through it during demos. *Suggestion:* a higher limit for verified hackathon projects, or a sponsor faucet at the booth.
+- **RPC rate limit (50 requests/s per IP)** is fine once known; our indexer polls every 2 seconds with batched calls and one shared client. Publishing the limit and the maximum `eth_getLogs` block range in the RPC docs would save guessing.
