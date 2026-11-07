@@ -9,6 +9,7 @@ import { useCheckout } from "@/lib/checkout/useCheckout";
 import type { Wallet } from "@/lib/wallet";
 import { buttonCls } from "@/components/ui/kit";
 import { LogoMark } from "@/components/brand/Logo";
+import { MerchantAvatar } from "@/components/checkout/MerchantAvatar";
 import { Lock } from "lucide-react";
 
 /** "1234.5" → "1,234.50 USDT" */
@@ -38,9 +39,7 @@ function Header({ session, loading, cancellable }: { session: PublicSession | nu
   return (
     <header className="flex items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-base)] border border-[var(--color-line)] bg-[var(--color-info-soft)] font-[family-name:var(--font-display)] text-lg font-semibold shadow-[var(--shadow-card)]" aria-hidden>
-          {session ? session.merchant.name.slice(0, 1).toUpperCase() : "Q"}
-        </span>
+        {session ? <MerchantAvatar key={session.id} name={session.merchant.name} siteUrl={session.cancelUrl} /> : <MerchantAvatar name="Q" />}
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">Pay</p>
           <h1 className="truncate text-2xl font-semibold">
