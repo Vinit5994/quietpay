@@ -27,7 +27,7 @@ Specific notes from building QuietPay's web app, the hosted checkout and the Swa
 - **Plain EVM.** Privy embedded wallets, viem and EIP-712 signing worked on chain 1874 without any Whitechain-specific code once the chain was defined.
 
 ## What was hard or missing
-- **`eth_getLogs` range limits aren't documented.** We didn't know the maximum block range per call, so the admin panel reads events in 5,000-block chunks to stay safe. *Suggestion:* state the limit in the RPC docs.
+- **`eth_getLogs` range limits aren't documented.** We didn't know the maximum block range per call, so the admin panel reads events in 10,000-block chunks to stay safe. *Suggestion:* state the limit in the RPC docs.
 - **No brand or press kit.** whitechain.io serves its header logo at `/logo.svg`, but there's no linked brand kit with light/dark variants or usage rules. The logo is drawn for light backgrounds; turning it white for a dark hero flattens the mark. *Workaround:* we show it on a white chip in its real colours. *Suggestion:* a small brand page with SVGs for light and dark backgrounds.
 
 ## Small things
