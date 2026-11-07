@@ -12,6 +12,7 @@ import { env } from "@/lib/env";
 import { shortAddress } from "@/lib/format";
 import { MerchantAuthProvider, useMerchantAuth } from "@/lib/merchant-auth";
 import { useWallet } from "@/lib/wallet";
+import { useAdminAccess } from "@/lib/admin/use-admin-access";
 
 const nav = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -35,6 +36,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
 function Gate({ children }: { children: React.ReactNode }) {
   const { session } = useMerchantAuth();
+  const access = useAdminAccess();
   if (session.state === "ready") return <Frame>{children}</Frame>;
   const step = session.state === "no_wallet" ? 0 : session.state === "signed_out" || session.state === "signing_in" ? 1 : session.state === "loading" ? -1 : 2;
   return (
@@ -69,6 +71,7 @@ function Gate({ children }: { children: React.ReactNode }) {
             <Logo size={28} />
           </Link>
           <h2 className="mt-8 text-3xl font-semibold lg:mt-0">{step === 2 ? "Name your business" : "Merchant dashboard"}</h2>
+          {access.allowed ? <Link href="/admin" className="mt-4 inline-block font-medium text-[var(--color-link)] hover:underline">Open platform admin →</Link> : null}
           <p className="mt-2 text-[var(--color-muted)]">
             {step === 2 ? "This is what customers see at checkout." : "Sign in to take payments, issue refunds and see your customers."}
           </p>
@@ -224,6 +227,7 @@ function Frame({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { session, signOut } = useMerchantAuth();
   const wallet = useWallet();
+  const access = useAdminAccess();
   if (session.state !== "ready") return null;
   return (
     <div className="min-h-dvh md:flex">
@@ -245,6 +249,7 @@ function Frame({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:mt-2 md:flex-col md:pb-0" aria-label="Dashboard">
+          {access.allowed ? <Link href="/admin" className="whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-[var(--color-link)] hover:underline">Platform admin</Link> : null}
           {nav.map((item) => {
             const active = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
             return (

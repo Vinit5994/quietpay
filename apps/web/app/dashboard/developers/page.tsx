@@ -39,7 +39,26 @@ export default function DevelopersPage() {
 
   return (
     <>
-      <PageHeader title="Developers" description="API keys, webhooks and the integration code your server needs." />
+      <PageHeader title="Developers" description="Documentation, API keys and webhooks for your QuietPay integration." />
+      <Panel title="QuietPay documentation" className="mb-6">
+        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm text-[var(--color-muted)]">Read the QuietPay docs on GitBook to build your integration.</p>
+            <Link href="/dashboard/integrate" className="mt-2 inline-block text-sm text-[var(--color-link)] hover:underline">
+              Start with the integration guide
+            </Link>
+          </div>
+          <a
+            href="https://quietpay.gitbook.io/quietpay-docs"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open QuietPay documentation on GitBook (opens in a new tab)"
+            className="inline-flex shrink-0 items-center justify-center rounded-lg bg-[var(--color-pine)] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-pine)]"
+          >
+            Open documentation ↗
+          </a>
+        </div>
+      </Panel>
       {message ? (
         <div className="mb-4">
           <Notice tone={message.tone}>{message.text}</Notice>

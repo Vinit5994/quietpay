@@ -53,7 +53,10 @@ export function MerchantAuthProvider({ children }: { children: React.ReactNode }
       const merchant = await api("dashGetMerchant", { token });
       setSession({ state: "ready", token, merchant });
     } catch (err) {
-      if (err instanceof ApiError && err.code === "not_found") setSession({ state: "onboarding", token });
+      // The real API rejects wallets without a merchant with 403; the mock uses 404.
+      if (err instanceof ApiError && (err.code === "not_found" || (err.status === 403 && err.code === "forbidden"))) {
+        setSession({ state: "onboarding", token });
+      }
       else if (err instanceof ApiError && err.status === 401) {
         if (wallet.address) write(key(wallet.address), null);
         setSession({ state: "signed_out", error: "Your session expired. Sign in again." });

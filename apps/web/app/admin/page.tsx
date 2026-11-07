@@ -5,7 +5,8 @@ import { CircleDollarSign, LogOut, Receipt, RefreshCw, Repeat, ShieldCheck, Stor
 import { QUIETPAY_ADDRESS, explorerAddress, explorerTx, fromUnits } from "@quietpay/shared";
 import { Logo } from "@/components/brand/Logo";
 import { Button, Notice, Panel, Skeleton, Stat, Table } from "@/components/ui/kit";
-import { isAdmin, loadAdminStats, type ActivityKind, type DayBucket } from "@/lib/admin/chain";
+import { loadAdminStats, type ActivityKind, type DayBucket } from "@/lib/admin/chain";
+import { useAdminAccess } from "@/lib/admin/use-admin-access";
 import { shortAddress, usdt } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
 import { useWallet } from "@/lib/wallet";
@@ -15,6 +16,7 @@ const when = (d: Date | null) => (d ? d.toLocaleString(undefined, { dateStyle: "
 
 export default function AdminPage() {
   const wallet = useWallet();
+  const access = useAdminAccess();
 
   if (wallet.status === "loading") return <Centered>Loading…</Centered>;
   if (wallet.status === "signed_out" || !wallet.address) {
@@ -31,11 +33,20 @@ export default function AdminPage() {
       </Centered>
     );
   }
-  if (!isAdmin(wallet.address)) {
+  if (access.loading) return <Centered>Checking platform access…</Centered>;
+  if (access.error) {
+    return (
+      <Centered>
+        <Notice tone="bad">Couldn&apos;t verify platform access. Please try again.</Notice>
+        <Button className="mt-4" onClick={access.reload}>Try again</Button>
+      </Centered>
+    );
+  }
+  if (!access.allowed) {
     return (
       <Centered>
         <p className="text-sm">
-          <span className="font-mono">{shortAddress(wallet.address)}</span> isn&apos;t on the team list. Add it to <code className="font-mono text-xs">NEXT_PUBLIC_ADMIN_ADDRESSES</code> to give it access.
+          <span className="font-mono">{shortAddress(wallet.address)}</span> doesn&apos;t have platform access. Connect the contract owner wallet or a team wallet.
         </p>
         <Button variant="secondary" className="mt-4 w-full" onClick={() => void wallet.logout()}>
           Use a different account

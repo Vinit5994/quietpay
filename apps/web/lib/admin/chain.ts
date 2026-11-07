@@ -155,3 +155,12 @@ export function isAdmin(address: string | null | undefined): boolean {
     .filter(Boolean);
   return list.includes(address.toLowerCase());
 }
+
+/** The current contract owner can view the platform overview alongside configured team wallets. */
+export async function loadAdminAccess(address: string | null | undefined) {
+  if (!address) return { address: null, allowed: false };
+  if (isAdmin(address)) return { address, allowed: true };
+  if (!QUIETPAY_ADDRESS) return { address, allowed: false };
+  const owner = await client.readContract({ address: QUIETPAY_ADDRESS, abi: quietPayAbi, functionName: "owner" });
+  return { address, allowed: owner.toLowerCase() === address.toLowerCase() };
+}
