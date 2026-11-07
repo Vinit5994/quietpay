@@ -11,7 +11,7 @@ Every merchant gets two secrets. Both are **shown once**.
 | Secret key | `sk_test_…` | Authenticating your server's API calls (`Authorization: Bearer sk_test_…`) |
 | Webhook secret | `whsec_…` | Verifying that webhooks really come from QuietPay |
 
-You get them when you **onboard in the QuietPay dashboard**: sign in with your payout wallet and enter a business name. If you run the API yourself, `pnpm --filter @quietpay/api seed` prints them for the demo merchant.
+You get them when you **onboard in the QuietPay dashboard**: sign in with your payout wallet and enter a business name. The dashboard's **Integrate** page then walks you through the rest of this guide with your own key prefix and live done/not-done checks. If you run the API yourself, `pnpm --filter @quietpay/api seed` prints them for the demo merchant.
 
 - **Lost the secret key?** Rotate it in the dashboard under Developers. The old key stops working immediately.
 - **Lost the webhook secret?** Setting the webhook URL again issues a new one.
@@ -24,7 +24,17 @@ QUIETPAY_WEBHOOK_SECRET=whsec_...
 QUIETPAY_API_URL=http://localhost:4000   # optional, see below
 ```
 
-## 2. Install and create a client
+## 2. Fund your gas balance
+
+QuietPay pays the network fee for every payment, refund and renewal, so neither you nor your customers handle gas. It pays from **your business's own gas balance**:
+
+1. In the dashboard, open **Developers → Gas balance**.
+2. Send some WBT (on testnet, from the Whitechain faucet) from your wallet to the relayer address shown there. Your wallet asks you to confirm the transfer.
+3. QuietPay checks the transfer on-chain and credits it to your balance. Only your business can spend it.
+
+Each payment, refund or renewal costs about 0.001 WBT of gas on testnet. If the balance runs out, new payments fail with [`merchant_gas_budget_exhausted`](07-errors.md) and your customers see "This store can't take payments right now". They are never shown gas or WBT.
+
+## 3. Install and create a client
 
 Inside this monorepo, add it as a workspace dependency, which is how Swag Counter uses it:
 
@@ -54,7 +64,7 @@ export default { transpilePackages: ["@quietpay/node", "@quietpay/shared"] };
 
 **Create the client lazily** if your build runs without the key (for example `next build` on a CI box). The constructor throws on an empty key, so build the client inside your handler, or behind a function, instead of at module load.
 
-## 3. Create a checkout session and redirect
+## 4. Create a checkout session and redirect
 
 ```ts
 const session = await qp.checkout.sessions.create({
@@ -71,9 +81,11 @@ const session = await qp.checkout.sessions.create({
 redirect(session.url); // QuietPay's hosted checkout
 ```
 
+Prefer to keep the customer on your page? [Open the checkout in a pop-up](02-checkout.md#open-checkout-in-a-pop-up) instead of redirecting.
+
 **Amounts are strings** in USDT with at most 2 decimals (`"25.00"`), never JavaScript numbers. See [Checkout](02-checkout.md).
 
-## 4. Receive the webhook
+## 5. Receive the webhook
 
 ```ts
 // POST /api/webhooks/quietpay
@@ -102,10 +114,10 @@ await qp.webhookEndpoint.test(); // sends a `ping` right away
 
 See [Webhooks](03-webhooks.md) for every event.
 
-## 5. Try it
+## 6. Try it
 
 1. Create a session and open `session.url`.
-2. Sign in with Google or email. An embedded wallet is created for you.
+2. Sign in with email or Google (an embedded wallet is created for you), or connect MetaMask.
 3. On testnet, fund the wallet from the demo funding page (`/demo/fund`, testnet only), then pay.
 4. The checkout shows the explorer link. Within about a second, your webhook gets `payment.succeeded`.
 

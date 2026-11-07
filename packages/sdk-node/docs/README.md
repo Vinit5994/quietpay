@@ -1,6 +1,6 @@
 # QuietPay for developers
 
-**QuietPay** lets any business accept **USDT on Whitechain**: hosted checkout, payment links, subscriptions with failed-payment handling, refunds and signed webhooks. Your customers never pay gas, pick a network or see a seed phrase. They sign in with Google or email and approve a single message. The money lands **directly in your own wallet**.
+**QuietPay** lets any business accept **USDT on Whitechain**: hosted checkout, payment links, subscriptions with failed-payment handling, refunds and signed webhooks. Your customers never pay gas, pick a network or see a seed phrase. They sign in with email or Google (or connect MetaMask) and approve a single message. The money lands **directly in your own wallet**.
 
 ```ts
 import { QuietPay } from "@quietpay/node";
@@ -33,9 +33,9 @@ const session = await qp.checkout.sessions.create({
 
 ## How it works
 
-1. **You** create a checkout session on your server and redirect the customer to QuietPay's hosted page.
+1. **You** create a checkout session on your server and send the customer to QuietPay's hosted page (a redirect, or a [pop-up over your site](02-checkout.md#open-checkout-in-a-pop-up)).
 2. **The customer** signs one EIP-3009 authorization: "move exactly 37.00 USDT to QuietPay for this order". That's free; no gas.
-3. **QuietPay's relayer** submits it on-chain and pays the gas.
+3. **QuietPay's relayer** submits it on-chain and pays the gas from **your business's gas balance** (you top it up with WBT; your customers never pay any).
 4. **The [QuietPay contract](https://explorer.testnet.whitechain.io/address/0x8ed9E91D00CbeB77F492863dc101C073F9152aC5)** checks your signed invoice and moves the USDT straight to your payout wallet.
 5. **Your server** receives a signed `payment.succeeded` webhook and fulfils the order.
 
