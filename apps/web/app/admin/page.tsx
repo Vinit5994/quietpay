@@ -94,7 +94,6 @@ function Admin({ address, onSignOut }: { address: string; onSignOut: () => void 
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        <AdminGasFunding key={address} />
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-semibold">Platform</h1>
@@ -182,6 +181,9 @@ function Admin({ address, onSignOut }: { address: string; onSignOut: () => void 
           )}
         </Panel>
         <p className="mt-4 text-xs text-[var(--color-muted)]">Business names and emails live in each API instance, not on-chain, so merchants show by on-chain id.</p>
+        <div className="mt-6">
+          <AdminGasFunding key={address} />
+        </div>
       </main>
     </div>
   );

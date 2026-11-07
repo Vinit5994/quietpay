@@ -23,6 +23,7 @@ import { CopyCode } from "@/components/landing/CopyCode";
 import { integrationSnippets } from "@/components/landing/snippets";
 
 const demoStoreUrl = process.env.NEXT_PUBLIC_DEMO_STORE_URL ?? "http://localhost:3002";
+const documentationUrl = "https://quietpay.gitbook.io/quietpay-docs";
 
 const tabs = integrationSnippets;
 
@@ -116,7 +117,8 @@ export default function Home() {
           <nav className="flex items-center gap-1 text-sm">
             <a href="#how" className="hidden rounded-lg px-3 py-2 text-white/70 hover:text-white md:block">How it works</a>
             <a href="#integrate" className="hidden rounded-lg px-3 py-2 text-white/70 hover:text-white md:block">Integrate</a>
-            <Link href="/dashboard" className="rounded-lg px-3 py-2 text-white/80 hover:text-white">Sign in</Link>
+            <a href={documentationUrl} target="_blank" rel="noopener noreferrer" aria-label="Documentation (opens in a new tab)" className="rounded-lg px-3 py-2 text-white/80 hover:text-white">Docs</a>
+            <Link href="/dashboard" className="hidden rounded-lg px-3 py-2 text-white/80 hover:text-white sm:block">Sign in</Link>
             <Link href="/dashboard" className="ml-1 inline-flex h-9 items-center rounded-lg bg-white px-3.5 font-medium text-[var(--color-pine)] hover:bg-[var(--color-brand-soft)]">
               Get started
             </Link>
@@ -200,6 +202,10 @@ export default function Home() {
           <p className="mt-3 max-w-2xl text-[var(--color-muted)]">
             Swag Counter, our demo store, runs exactly the code above. It never touches a wallet or the blockchain. It only talks to QuietPay.
           </p>
+          <a href={documentationUrl} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[var(--color-link)] hover:underline">
+            Read the documentation <ArrowUpRight className="h-4 w-4" aria-hidden />
+            <span className="sr-only">(opens in a new tab)</span>
+          </a>
           <ol className="mt-10 grid gap-5 md:grid-cols-3">
             {steps.map((s, i) => (
               <li key={s.title} className="rounded-2xl border border-[var(--color-line)] bg-white p-6">
@@ -246,6 +252,10 @@ export default function Home() {
             </div>
           </div>
           <div className="flex flex-col gap-2 text-sm md:items-end">
+            <a href={documentationUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[var(--color-muted)] hover:text-[var(--color-ink)]">
+              Documentation <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+              <span className="sr-only">(opens in a new tab)</span>
+            </a>
             <Link href="/dashboard" className="text-[var(--color-muted)] hover:text-[var(--color-ink)]">Merchant dashboard</Link>
             <Link href="/portal" className="text-[var(--color-muted)] hover:text-[var(--color-ink)]">Manage your subscriptions</Link>
             {QUIETPAY_ADDRESS ? (
