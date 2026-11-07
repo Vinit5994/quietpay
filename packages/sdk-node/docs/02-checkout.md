@@ -61,11 +61,44 @@ await qp.checkout.sessions.create({
 
 ## What happens on the hosted page
 
-1. QuietPay shows your business name, the items and the total.
-2. The customer signs in (Google or email) and gets an embedded wallet.
+1. QuietPay shows your business name and icon, the items and the total. The icon is your site's own (`/icon.svg`, then `/favicon.ico`, on the origin of your `cancelUrl`); without one, the first letter of your business name is shown.
+2. The customer signs in with email or Google and gets an embedded wallet, or connects MetaMask.
 3. If their USDT balance is too low, the page says exactly how much they have and need.
 4. They sign one `ReceiveWithAuthorization` message for exactly this amount, to QuietPay, for this order.
 5. QuietPay's relayer submits it and pays the gas. The contract checks **your invoice signature** (QuietPay signs it with your merchant key when the session is created), then moves the USDT to your payout wallet.
-6. The customer sees the explorer link and returns to your `successUrl`.
+6. The customer sees the explorer link and returns to your `successUrl` (or, in a pop-up, the window closes and your page is told; see below).
 
 **Safety:** a signature can only pay **this order, once, to QuietPay**. The nonce is derived from your merchant id and the order id, and the token only lets QuietPay redeem it. Copying it can't redirect the money.
+
+## Open checkout in a pop-up
+
+Instead of redirecting, you can open the hosted checkout in a pop-up window over your site, so the customer never leaves your page. Add `popup=1` to the session URL and open it with `window.open`. When the customer finishes or cancels, the checkout sends your page one message and closes itself:
+
+```ts
+{ type: "quietpay:checkout", status: "completed" | "canceled", sessionId: "sess_…", redirectUrl: "https://shop.example/orders/1001" }
+```
+
+The message is posted only to the origin of your `successUrl`. A minimal client helper:
+
+```ts
+// In the click handler: open the window first (before any await), or browsers block it.
+const popup = window.open("", "quietpay-checkout", "popup=yes,width=460,height=760");
+const { url } = await createCheckout(); // your server calls qp.checkout.sessions.create and returns session.url
+if (!popup) return location.assign(url); // pop-up blocked or a phone: fall back to the redirect
+
+const target = new URL(url);
+target.searchParams.set("popup", "1");
+popup.location.href = target.href;
+
+window.addEventListener("message", (e) => {
+  if (e.origin !== target.origin || e.data?.type !== "quietpay:checkout") return; // only trust QuietPay
+  if (e.data.status === "completed") location.assign(e.data.redirectUrl); // e.g. your order page
+});
+```
+
+- **Fulfil from the webhook, not the message.** The message only moves the customer along; `payment.succeeded` is still the source of truth.
+- **Only navigate within your own site.** Check that `redirectUrl` is on your origin before using it.
+- A real window (not an iframe) is required, so the customer's login and wallet keep working.
+- On small screens, just redirect: pop-ups open as new tabs on phones anyway.
+
+Swag Counter's full helper, with an overlay and close detection, is in [`apps/store/lib/quietpay-checkout.tsx`](https://github.com/Vinit5994/quietpay/blob/main/apps/store/lib/quietpay-checkout.tsx).

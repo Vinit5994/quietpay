@@ -18,6 +18,7 @@ link.qrSvg; // an SVG QR code for link.url, ready to render or print
 - **Every visit creates a fresh checkout session,** so one printed QR can be paid any number of times.
 - **Payments are recorded with `reference: "link:<slug>"`,** and the webhooks carry that as `merchantReference`.
 - **Slugs come from the title** (`sticker-pack`). If a slug is taken, a suffix is added (`sticker-pack-2`).
+- **After paying, the customer lands on their receipt** (there's no store page to return to). The receipt shows the items, the amount and the explorer link, and stays available in the customer portal.
 
 `qp.paymentLinks.list()` returns your links.
 
