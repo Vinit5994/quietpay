@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { CheckoutOverlay, useQuietPayCheckout } from "@/lib/quietpay-checkout";
 import { ProductImage } from "@/components/ProductImage";
 import { useCart } from "@/lib/cart";
 import { findProduct } from "@/lib/products";
@@ -10,8 +10,9 @@ import { checkout } from "./actions";
 
 export function CartView() {
   const cart = useCart();
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const qp = useQuietPayCheckout();
+  const pending = qp.phase !== "idle";
+  const error = qp.error;
 
   if (!cart.ready) return <div className="h-40 animate-pulse rounded-xl bg-[var(--color-line)]/40" aria-label="Loading cart" />;
 
@@ -27,13 +28,7 @@ export function CartView() {
     );
   }
 
-  const pay = () => {
-    setError(null);
-    startTransition(async () => {
-      const result = await checkout(cart.items);
-      if (result?.error) setError(result.error);
-    });
-  };
+  const pay = () => qp.start(() => checkout(cart.items));
 
   return (
     <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -110,10 +105,11 @@ export function CartView() {
           disabled={pending}
           className="mt-5 h-13 w-full rounded-lg bg-[var(--color-primary)] py-3.5 text-lg font-semibold text-white transition hover:bg-[var(--color-primary-hover)] disabled:opacity-70"
         >
-          {pending ? "Creating your order…" : "Pay with USDT"}
+          {qp.phase === "preparing" ? "Creating your order…" : qp.phase === "open" ? "Waiting for payment…" : "Pay with USDT"}
         </button>
         <p className="mt-3 text-center text-xs text-[var(--color-muted)]">Secure checkout by QuietPay. Sign in with email or Google; no crypto app needed.</p>
       </aside>
+      <CheckoutOverlay phase={qp.phase} onFocus={qp.focus} onCancel={qp.cancel} />
     </div>
   );
 }

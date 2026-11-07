@@ -62,7 +62,11 @@ export const MESSAGES = {
   alreadyPaid: "This order has already been paid.",
   notFound: "This checkout link doesn't work. Go back to the store and try again.",
   signRejected: "You closed the signature request. You haven't been charged.",
+  merchantUnavailable: "This store can't take payments right now. You haven't been charged. Please try again later or contact the store.",
 };
+
+/** API errors whose wording is meant for merchants (gas, budgets), rephrased for customers. */
+const customerMessage = (code: string, message: string) => (code === "merchant_gas_budget_exhausted" ? MESSAGES.merchantUnavailable : message);
 
 /** The messages the customer signs, in order. */
 export function signSteps(prepare: PrepareSessionResponse): SignStep[] {
@@ -147,7 +151,7 @@ export function reducer(phase: Phase, action: Action): Phase {
       if (s.status === "complete") return { name: "success", session: phase.session, status: s };
       if (s.status === "expired") return { name: "closed", session: phase.session, reason: "expired", message: MESSAGES.expired };
       if (s.status === "open") {
-        return payIdle(phase.session, s.error?.message ?? "The payment didn't go through. You haven't been charged. Please try again.");
+        return payIdle(phase.session, s.error ? customerMessage(s.error.code, s.error.message) : "The payment didn't go through. You haven't been charged. Please try again.");
       }
       return { ...phase, txHash: s.txHash ?? phase.txHash };
     }
@@ -160,7 +164,7 @@ export function reducer(phase: Phase, action: Action): Phase {
       }
       if (action.code === "not_found") return { name: "closed", session, reason: "not_found", message: MESSAGES.notFound };
       // Everything else is retryable from the pay screen.
-      return payIdle(session, action.message);
+      return payIdle(session, customerMessage(action.code, action.message));
     }
 
     case "expired_locally":

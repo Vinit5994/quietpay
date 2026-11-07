@@ -10,6 +10,7 @@ import type { Wallet } from "@/lib/wallet";
 import { buttonCls } from "@/components/ui/kit";
 import { LogoMark } from "@/components/brand/Logo";
 import { MerchantAvatar } from "@/components/checkout/MerchantAvatar";
+import { finishInPopup, inCheckoutPopup } from "@/lib/checkout/popup";
 import { Lock } from "lucide-react";
 
 /** "1234.5" → "1,234.50 USDT" */
@@ -48,7 +49,15 @@ function Header({ session, loading, cancellable }: { session: PublicSession | nu
         </div>
       </div>
       {session && cancellable ? (
-        <a href={session.cancelUrl} className={buttonCls("secondary", "sm")}>
+        <a
+          href={session.cancelUrl}
+          className={buttonCls("secondary", "sm")}
+          onClick={(e) => {
+            if (!inCheckoutPopup()) return;
+            e.preventDefault();
+            finishInPopup("canceled", session, session.cancelUrl, session.cancelUrl);
+          }}
+        >
           Cancel
         </a>
       ) : null}
@@ -207,14 +216,21 @@ function SuccessView({ phase }: { phase: Extract<Phase, { name: "success" }> }) 
   const toReceipt = Boolean(redirect && redirect === status.receiptUrl);
   const [seconds, setSeconds] = useState(3);
 
+  const leave = () => {
+    if (!redirect) return;
+    if (inCheckoutPopup()) finishInPopup("completed", session, status.redirectUrl, redirect);
+    else window.location.assign(redirect);
+  };
+
   useEffect(() => {
     if (!redirect) return;
     if (seconds <= 0) {
-      window.location.assign(redirect);
+      leave();
       return;
     }
     const t = setTimeout(() => setSeconds((s) => s - 1), 1_000);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seconds, redirect]);
 
   const amount = session.mode === "subscription" && session.plan ? session.plan.amount : session.amount;
@@ -244,7 +260,14 @@ function SuccessView({ phase }: { phase: Extract<Phase, { name: "success" }> }) 
       {redirect ? (
         <p className="mt-5 text-sm text-[var(--color-muted)]">
           {toReceipt ? "Opening your receipt" : `Returning to ${session.merchant.name}`} in {Math.max(seconds, 0)}…{" "}
-          <a href={redirect} className={linkCls}>
+          <a
+            href={redirect}
+            className={linkCls}
+            onClick={(e) => {
+              e.preventDefault();
+              leave();
+            }}
+          >
             {toReceipt ? "Open now" : "Return now"}
           </a>
         </p>
@@ -288,7 +311,16 @@ function ClosedView({ phase }: { phase: Extract<Phase, { name: "closed" }> }) {
           </button>
         ) : null}
         {s ? (
-          <a href={phase.reason === "already_paid" ? s.successUrl : s.cancelUrl} className={phase.reason === "error" ? secondaryBtn : primaryBtn}>
+          <a
+            href={phase.reason === "already_paid" ? s.successUrl : s.cancelUrl}
+            className={phase.reason === "error" ? secondaryBtn : primaryBtn}
+            onClick={(e) => {
+              if (!inCheckoutPopup()) return;
+              e.preventDefault();
+              const paid = phase.reason === "already_paid";
+              finishInPopup(paid ? "completed" : "canceled", s, paid ? s.successUrl : s.cancelUrl, paid ? s.successUrl : s.cancelUrl);
+            }}
+          >
             Back to {s.merchant.name}
           </a>
         ) : null}
