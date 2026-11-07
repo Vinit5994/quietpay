@@ -7,6 +7,7 @@ import { ApiError } from "../lib/errors";
 import { newId, nowSeconds } from "../lib/ids";
 import { decodeRevert } from "./errors";
 import { relayerRateLimits } from "./ratelimit";
+import { fundedGasWei, reservedGasWei } from "../services/gas";
 
 export const LOW_BALANCE_WEI = 50_000_000_000_000_000n; // 0.05 WBT
 /** Conservative per-call gas used for the budget check (pay ≈ 245k, subscribe ≈ 300k). */
@@ -28,8 +29,10 @@ export type RelayRequest = {
   purpose: Purpose;
   /** Runs after the receipt arrives (success or revert). */
   onReceipt?: (receipt: TxReceipt, txHash: Hex) => void | Promise<void>;
-  /** Runs if broadcasting or the receipt wait throws. */
+  /** Runs on a definite application failure. */
   onError?: (err: ApiError) => void | Promise<void>;
+  /** Receipt status is unknown: keep the application action pending and retain reserved gas. */
+  onPending?: (err: ApiError) => void | Promise<void>;
 };
 
 /**
@@ -40,6 +43,8 @@ export class Relayer {
   readonly limits = relayerRateLimits();
   private queue: Promise<unknown> = Promise.resolve();
   private inFlight = new Set<Promise<unknown>>();
+  private watching = new Set<string>();
+  private receiptRequests = new Map<string, RelayRequest>();
 
   constructor(private readonly deps: Deps) {}
 
@@ -58,9 +63,11 @@ export class Relayer {
 
     // 7. merchant gas budget
     const gasPrice = await deps.chain.gasPrice();
-    const estimate = (GAS_LIMITS[req.fn] ?? DEFAULT_GAS_LIMIT) * gasPrice;
-    const fresh = deps.db.select().from(merchants).where(eq(merchants.id, req.merchant.id)).get() ?? req.merchant;
-    const remaining = BigInt(fresh.gasBudgetWei) - BigInt(fresh.gasSpentWei);
+    const gas = GAS_LIMITS[req.fn] ?? DEFAULT_GAS_LIMIT;
+    const estimate = gas * gasPrice;
+    const fresh = deps.db.select().from(merchants).where(eq(merchants.id, req.merchant.id)).get();
+    if (!fresh) throw new ApiError(404, "not_found", "Merchant not found.");
+    const remaining = fundedGasWei(deps, fresh.id) - BigInt(fresh.gasSpentWei) - reservedGasWei(deps, fresh.id);
     if (estimate > remaining) {
       throw new ApiError(
         402,
@@ -78,35 +85,55 @@ export class Relayer {
 
     // 9. send on one serialized queue
     const rtxId = newId("rtx");
-    deps.db
-      .insert(relayerTxs)
-      .values({ id: rtxId, merchantId: req.merchant.id, purpose: req.purpose, status: "pending", createdAt: nowSeconds() })
-      .run();
-
-    const sent = this.queue.then(() => deps.chain.send(req.fn, req.args));
+    const sent = this.queue.then(async () => {
+      const balance = await deps.chain.relayerBalance();
+      deps.db.transaction(() => {
+        const merchant = deps.db.select().from(merchants).where(eq(merchants.id, req.merchant.id)).get()!;
+        const available = fundedGasWei(deps, merchant.id) - BigInt(merchant.gasSpentWei) - reservedGasWei(deps, merchant.id);
+        if (available < estimate) throw new ApiError(402, "merchant_gas_budget_exhausted", "This business needs to top up its gas balance before sending another transaction.");
+        if (balance - reservedGasWei(deps) < estimate) throw new ApiError(402, "merchant_gas_budget_exhausted", "The relayer needs refuelling before it can send another transaction. Contact the platform admin.");
+        deps.db.insert(relayerTxs).values({ id: rtxId, merchantId: merchant.id, purpose: req.purpose, status: "pending", gasCostWei: estimate.toString(), createdAt: nowSeconds() }).run();
+      }, { behavior: "immediate" });
+      // Fixed gas and gas price cap the possible fee at this business's reservation.
+      return deps.chain.send(req.fn, req.args, { gas, gasPrice });
+    });
     this.queue = sent.catch(() => undefined);
     let txHash: Hex;
     try {
       txHash = await sent;
     } catch (err) {
+      if (err instanceof ApiError) throw err;
       const e = decodeRevert(err);
-      deps.db.update(relayerTxs).set({ status: "failed", error: e.message }).where(eq(relayerTxs.id, rtxId)).run();
+      // A transport error can occur after acceptance. Keep its reservation until reconciled.
+      deps.db.update(relayerTxs).set({ error: `Broadcast uncertain: ${e.message}` }).where(eq(relayerTxs.id, rtxId)).run();
       throw new ApiError(500, "transaction_failed", `Could not send the transaction: ${e.message}`);
     }
     deps.db.update(relayerTxs).set({ txHash }).where(eq(relayerTxs.id, rtxId)).run();
     console.log(`[relayer] ${req.purpose} ${req.fn} sent ${txHash}`);
 
+    this.receiptRequests.set(rtxId, req);
     const tracked = this.finish(req, rtxId, txHash);
     this.inFlight.add(tracked);
     void tracked.finally(() => this.inFlight.delete(tracked));
     return txHash;
   }
 
+  /** Retry receipt accounting after timeouts or process restarts; reservations survive in SQLite. */
+  async recoverPending() {
+    const pending = this.deps.db.select().from(relayerTxs).where(eq(relayerTxs.status, "pending")).all();
+    await Promise.all(pending.filter((tx) => tx.txHash && tx.merchantId && !this.watching.has(tx.id)).map(async (tx) => {
+      const merchant = this.deps.db.select().from(merchants).where(eq(merchants.id, tx.merchantId!)).get();
+      if (!merchant) return;
+      const req = this.receiptRequests.get(tx.id) ?? { merchant, fn: "pay" as const, args: [], purpose: tx.purpose };
+      await this.finish(req, tx.id, tx.txHash as Hex);
+    }));
+  }
+
   /**
    * Relays and waits for the receipt (operator calls the API needs the result of, e.g. createPlan's planId).
    * Rejects if the tx reverts on-chain.
    */
-  async relayAndWait(req: Omit<RelayRequest, "onReceipt" | "onError">): Promise<{ txHash: Hex; receipt: TxReceipt }> {
+  async relayAndWait(req: Omit<RelayRequest, "onReceipt" | "onError" | "onPending">): Promise<{ txHash: Hex; receipt: TxReceipt }> {
     return new Promise((resolve, reject) => {
       this.relay({
         ...req,
@@ -115,6 +142,7 @@ export class Relayer {
             ? resolve({ txHash, receipt })
             : reject(new ApiError(500, "transaction_failed", `Transaction ${txHash} reverted on-chain.`)),
         onError: reject,
+        onPending: reject,
       }).catch(reject);
     });
   }
@@ -122,30 +150,32 @@ export class Relayer {
   /** Receipt → relayer_txs + merchant gas_spent_wei → caller hook → 10. low-balance alert. */
   private async finish(req: RelayRequest, rtxId: string, txHash: Hex) {
     const { deps } = this;
+    if (this.watching.has(rtxId)) return;
+    this.watching.add(rtxId);
     try {
       const receipt = await deps.chain.waitForReceipt(txHash);
       const cost = receipt.gasUsed * receipt.effectiveGasPrice;
-      deps.db
-        .update(relayerTxs)
-        .set({
+      const settled = deps.db.transaction(() => {
+        const pending = deps.db.select().from(relayerTxs).where(eq(relayerTxs.id, rtxId)).get();
+        if (pending?.status !== "pending") return false;
+        deps.db.update(relayerTxs).set({
           status: receipt.status === "success" ? "succeeded" : "failed",
-          gasUsed: receipt.gasUsed.toString(),
-          gasCostWei: cost.toString(),
+          gasUsed: receipt.gasUsed.toString(), gasCostWei: cost.toString(),
           error: receipt.status === "success" ? null : "reverted on-chain",
-        })
-        .where(eq(relayerTxs.id, rtxId))
-        .run();
-      // better-sqlite3 is synchronous, so this read-modify-write can't interleave with another one.
-      const m = deps.db.select().from(merchants).where(eq(merchants.id, req.merchant.id)).get();
-      if (m) {
-        const spent = (BigInt(m.gasSpentWei) + cost).toString();
-        deps.db.update(merchants).set({ gasSpentWei: spent }).where(eq(merchants.id, m.id)).run();
-      }
-      await req.onReceipt?.(receipt, txHash);
+        }).where(eq(relayerTxs.id, rtxId)).run();
+        const m = deps.db.select().from(merchants).where(eq(merchants.id, req.merchant.id)).get();
+        if (m) deps.db.update(merchants).set({ gasSpentWei: (BigInt(m.gasSpentWei) + cost).toString() }).where(eq(merchants.id, m.id)).run();
+        return true;
+      }, { behavior: "immediate" });
+      this.receiptRequests.delete(rtxId);
+      if (settled) await req.onReceipt?.(receipt, txHash);
     } catch (err) {
       console.error(`[relayer] receipt for ${txHash} failed`, err);
-      deps.db.update(relayerTxs).set({ status: "failed", error: String(err) }).where(eq(relayerTxs.id, rtxId)).run();
-      await req.onError?.(new ApiError(500, "transaction_failed", "The network did not confirm the transaction."));
+      // Do not free budget for a transaction whose final status is still unknown.
+      deps.db.update(relayerTxs).set({ error: String(err) }).where(eq(relayerTxs.id, rtxId)).run();
+      await req.onPending?.(new ApiError(500, "transaction_failed", "The network has not confirmed the transaction yet. Its gas remains reserved."));
+    } finally {
+      this.watching.delete(rtxId);
     }
 
     try {

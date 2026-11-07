@@ -8,6 +8,7 @@ import { ApiError, api } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 import { useMerchantAuth, useMerchantToken } from "@/lib/merchant-auth";
 import { PAGE_SIZE, useApi, usePager } from "@/lib/use-api";
+import { MerchantGasFunding } from "@/components/dashboard/GasFunding";
 
 
 export default function DevelopersPage() {
@@ -65,6 +66,7 @@ export default function DevelopersPage() {
         </div>
       ) : null}
 
+      <MerchantGasFunding />
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel title="API keys">
           <div className="space-y-4 p-5">

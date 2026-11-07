@@ -10,9 +10,10 @@ import { ApiError } from "../lib/errors";
 import { isoFromSeconds, newId, nowSeconds } from "../lib/ids";
 import { RateLimiter } from "../relayer/ratelimit";
 import { planById } from "./plans";
+import { fundedGasWei, reservedGasWei } from "./gas";
 
-/** Demo budget for new merchants (SPEC_API): 0.05 WBT. */
-export const NEW_MERCHANT_GAS_BUDGET_WEI = 50_000_000_000_000_000n;
+/** Businesses must deposit gas funds or receive an admin-sponsored deposit first. */
+export const NEW_MERCHANT_GAS_BUDGET_WEI = 0n;
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 
@@ -30,9 +31,10 @@ export function toMerchant(row: MerchantRow): Merchant {
 }
 
 export function gasSummary(deps: Deps, merchant: MerchantRow): GasSummary {
-  const budget = BigInt(merchant.gasBudgetWei);
+  const budget = fundedGasWei(deps, merchant.id);
   const spent = BigInt(merchant.gasSpentWei);
-  const remaining = budget > spent ? budget - spent : 0n;
+  const available = budget - spent - reservedGasWei(deps, merchant.id);
+  const remaining = available > 0n ? available : 0n;
   const txCount = deps.db
     .select()
     .from(relayerTxs)
@@ -143,8 +145,10 @@ export function rotateKey(deps: Deps, merchant: MerchantRow) {
  * POST /dash/gas/topup: a successful WBT transfer from the merchant's payout wallet to the relayer
  * raises the gas budget by its value. Each tx counts once.
  */
-export async function gasTopup(deps: Deps, merchant: MerchantRow, txHash: Hex) {
-  if (deps.db.select().from(gasTopups).where(eq(gasTopups.txHash, txHash.toLowerCase())).get()) {
+export async function gasTopup(deps: Deps, merchant: MerchantRow, txHash: Hex, sender = merchant.payoutAddress) {
+  const counted = deps.db.select().from(gasTopups).where(eq(gasTopups.txHash, txHash.toLowerCase())).get();
+  if (counted?.merchantId === merchant.id) return gasSummary(deps, deps.db.select().from(merchants).where(eq(merchants.id, merchant.id)).get()!);
+  if (counted) {
     throw new ApiError(409, "conflict", "This top-up was already counted.");
   }
   const tx = await deps.chain.nativeTransfer(txHash);
@@ -152,14 +156,22 @@ export async function gasTopup(deps: Deps, merchant: MerchantRow, txHash: Hex) {
   if (tx.to?.toLowerCase() !== deps.chain.relayerAddress.toLowerCase()) {
     throw new ApiError(400, "bad_request", `Send WBT to the relayer ${deps.chain.relayerAddress}.`);
   }
-  if (tx.from.toLowerCase() !== merchant.payoutAddress.toLowerCase()) {
-    throw new ApiError(400, "bad_request", "The top-up must come from your payout wallet.");
+  if (tx.from.toLowerCase() !== sender.toLowerCase()) {
+    throw new ApiError(400, "bad_request", "The top-up must come from the funding wallet you signed in with.");
   }
+  if (tx.from.toLowerCase() === tx.to.toLowerCase()) throw new ApiError(400, "bad_request", "A transfer from the relayer to itself cannot fund a gas balance. Use another funding wallet.");
   if (tx.value <= 0n) throw new ApiError(400, "bad_request", "The transaction sent no WBT.");
 
-  deps.db.insert(gasTopups).values({ txHash: txHash.toLowerCase(), merchantId: merchant.id, valueWei: tx.value.toString(), createdAt: nowSeconds() }).run();
-  const budget = (BigInt(merchant.gasBudgetWei) + tx.value).toString();
-  deps.db.update(merchants).set({ gasBudgetWei: budget }).where(eq(merchants.id, merchant.id)).run();
+  deps.db.transaction(() => {
+    // Repeat inside the write transaction: concurrent confirmations must never credit a transfer twice.
+    const existing = deps.db.select().from(gasTopups).where(eq(gasTopups.txHash, txHash.toLowerCase())).get();
+    if (existing?.merchantId === merchant.id) return;
+    if (existing) {
+      throw new ApiError(409, "conflict", "This top-up was already counted.");
+    }
+    deps.db.insert(gasTopups).values({ txHash: txHash.toLowerCase(), merchantId: merchant.id, valueWei: tx.value.toString(), createdAt: nowSeconds() }).run();
+    deps.db.update(merchants).set({ gasBudgetWei: fundedGasWei(deps, merchant.id).toString() }).where(eq(merchants.id, merchant.id)).run();
+  }, { behavior: "immediate" });
   return gasSummary(deps, deps.db.select().from(merchants).where(eq(merchants.id, merchant.id)).get()!);
 }
 

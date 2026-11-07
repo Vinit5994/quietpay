@@ -119,6 +119,8 @@ export default function OverviewPage() {
 
         <Panel title="Gas">
           <div className="space-y-3 p-5 text-sm">
+            <p>Available: <strong>{o ? `${o.gas.remaining} WBT` : "…"}</strong></p>
+            <Link href="/dashboard/developers" className="inline-block text-[var(--color-link)] hover:underline">Top up your business gas balance →</Link>
             <p>
               You&apos;ve spent <span className="tabular font-semibold">{o ? `${Number(o.gas.spent).toFixed(4)} WBT` : "…"}</span> on{" "}
               <span className="tabular font-semibold">{o?.gas.txCount ?? "…"}</span> transactions.

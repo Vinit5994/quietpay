@@ -10,6 +10,7 @@ import { useAdminAccess } from "@/lib/admin/use-admin-access";
 import { shortAddress, usdt } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
 import { useWallet } from "@/lib/wallet";
+import { AdminGasFunding } from "@/components/dashboard/AdminGasFunding";
 
 const money = (units: bigint) => usdt(fromUnits(units));
 const when = (d: Date | null) => (d ? d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—");
@@ -93,6 +94,7 @@ function Admin({ address, onSignOut }: { address: string; onSignOut: () => void 
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+        <AdminGasFunding key={address} />
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-semibold">Platform</h1>

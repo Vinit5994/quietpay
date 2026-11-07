@@ -27,9 +27,10 @@ import { createPlan } from "./services/plans";
 import { loadEnv } from "./env";
 import { encrypt, newSecretKey, newWebhookSecret } from "./lib/crypto";
 import { newId, nowSeconds } from "./lib/ids";
+import { gasSummary } from "./services/dash";
 
 const NAME = "Swag Counter";
-const GAS_BUDGET_WEI = 50_000_000_000_000_000n; // 0.05 WBT demo budget
+const GAS_BUDGET_WEI = 0n; // Fund through the dashboard; no unbacked demo credits.
 
 const env = loadEnv();
 const db = openDb(env.DATABASE_PATH);
@@ -54,6 +55,11 @@ async function ensureStickerLink(merchant: MerchantRow) {
 async function ensureBoxPlan(merchant: MerchantRow) {
   let plan = db.select().from(plans).where(eq(plans.name, BOX_PLAN)).all().find((p) => p.merchantId === merchant.id);
   if (!plan) {
+    if (BigInt(gasSummary(deps, merchant).remainingWei) === 0n) {
+      console.log("Fund this merchant’s gas balance in the admin dashboard, then rerun seed to create the Builder Box plan.");
+      await ensureStickerLink(merchant);
+      return;
+    }
     plan = await createPlan(deps, new Relayer(deps), merchant, {
       name: BOX_PLAN,
       amount: "15.00",

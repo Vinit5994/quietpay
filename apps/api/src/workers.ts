@@ -17,6 +17,7 @@ export function startWorkers(deps: Deps, services: Services) {
     setInterval(run("indexer", () => indexer.tick()), INDEXER_INTERVAL_MS),
     setInterval(run("webhooks", () => services.dispatcher.tick()), DISPATCH_INTERVAL_MS),
     setInterval(run("keeper", () => keeper.tick()), KEEPER_INTERVAL_MS),
+    setInterval(run("gas receipts", () => services.relayer.recoverPending()), 10_000),
   ];
   console.log(`  indexer from block ${(indexer.lastBlock() ?? "deploy").toString()}, webhooks dispatcher and keeper on`);
   return {

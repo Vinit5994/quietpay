@@ -140,7 +140,7 @@ describe("dashboard", () => {
     expect((await ctx.call("POST", "/v1/checkout/sessions", { body: hoodieSession, token: ob.secretKey })).status).toBe(201);
     expect((await ctx.call("POST", "/dash/merchant", { body: { name: "Again", payoutAddress: owner.address }, token: ob.token })).status).toBe(409);
     const row = ctx.deps.db.select().from(merchants).where(eq(merchants.id, ob.merchant.id)).get()!;
-    expect(row.gasBudgetWei).toBe("50000000000000000");
+    expect(row.gasBudgetWei).toBe("0");
   });
 
   it("overview, lists, key rotation and delivery log", async () => {
@@ -175,7 +175,7 @@ describe("dashboard", () => {
     const res = await ctx.call("POST", "/dash/gas/topup", { body: { txHash: ok }, token });
     expect(res.status).toBe(200);
     expect(res.body.budgetWei).toBe(String(5n * 10n ** 16n + 10n ** 17n));
-    expect((await ctx.call("POST", "/dash/gas/topup", { body: { txHash: ok }, token })).status).toBe(409);
+    expect((await ctx.call("POST", "/dash/gas/topup", { body: { txHash: ok }, token })).body.budgetWei).toBe(res.body.budgetWei);
     expect((await ctx.call("POST", "/dash/gas/topup", { body: { txHash: wrongTo }, token })).status).toBe(400);
     expect((await ctx.call("POST", "/dash/gas/topup", { body: { txHash: `0x${"cc".repeat(32)}` }, token })).status).toBe(404);
   });

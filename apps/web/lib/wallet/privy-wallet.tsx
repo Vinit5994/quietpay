@@ -108,6 +108,20 @@ function PrivyAdapter({ children }: { children: React.ReactNode }) {
     [address, activeWallet, privySignMessage],
   );
 
+  const sendNative = useCallback(async (to: Address, valueWei: bigint): Promise<Hex> => {
+    if (!address || !activeWallet) throw new Error("Sign in first");
+    if (valueWei <= 0n) throw new Error("Enter an amount greater than zero");
+    try {
+      await activeWallet.switchChain(whitechainSepolia.id);
+      const provider = await activeWallet.getEthereumProvider();
+      const client = createWalletClient({ account: address, chain: whitechainSepolia, transport: custom(provider) });
+      return await client.sendTransaction({ to, value: valueWei });
+    } catch (err) {
+      if (isRejection(err)) throw new SignatureRejectedError();
+      throw err;
+    }
+  }, [address, activeWallet]);
+
   const wallet = useMemo<Wallet>(
     () => ({
       // Wait for wallet creation or reconnection before showing the signed-in pages.
@@ -119,8 +133,9 @@ function PrivyAdapter({ children }: { children: React.ReactNode }) {
       logout: async () => logout(),
       signTypedData,
       signMessage,
+      sendNative,
     }),
-    [ready, authenticated, walletsReady, address, label, login, logout, signTypedData, signMessage],
+    [ready, authenticated, walletsReady, address, label, login, logout, signTypedData, signMessage, sendNative],
   );
 
   return <WalletContext.Provider value={wallet}>{children}</WalletContext.Provider>;

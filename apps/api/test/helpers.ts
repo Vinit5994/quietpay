@@ -14,7 +14,7 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { createApp } from "../src/app";
 import type { Chain, ChainEvent, RelayFunction, TxReceipt } from "../src/chain";
 import { openDb } from "../src/db/client";
-import { merchants } from "../src/db/schema";
+import { gasTopups, merchants } from "../src/db/schema";
 import type { Deps } from "../src/deps";
 import { loadEnv } from "../src/env";
 import { Relayer } from "../src/relayer";
@@ -107,6 +107,7 @@ export function fakeChain(balances: Record<string, bigint> = {}): FakeChain {
     },
     quietPay: QUIETPAY,
     relayerAddress: privateKeyToAccount(generatePrivateKey()).address,
+    contractOwner: async () => QUIETPAY,
     usdtBalance: async (owner) => balances[lc(owner)] ?? 0n,
     verifyMessage: (args) => verifyMessage(args),
     verifyTypedData: (args) => verifyTypedData(args as never),
@@ -287,6 +288,7 @@ export function setup(opts: { onchainId?: string; env?: Record<string, string> }
         createdAt: nowSeconds(),
       })
       .run();
+    deps.db.insert(gasTopups).values({ txHash: keccak256(toHex(`fixture-funding-${id}`)), merchantId: id, valueWei: "50000000000000000", createdAt: nowSeconds() }).run();
     return { id, webhookSecret: whsec, secretKey: sk.key, signer: privateKeyToAccount(signerKey), payout: privateKeyToAccount(payoutKey), onchainId };
   };
 

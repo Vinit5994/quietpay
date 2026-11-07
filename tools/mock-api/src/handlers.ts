@@ -484,6 +484,9 @@ export const handlers: Handlers = {
     m.gasBudgetWei += 50_000_000_000_000_000n;
     return gasSummary(m);
   },
+  dashGas: () => { throw new MockError("forbidden", "Gas deposits require the real API. No WBT should be sent to the mock relayer.", 403); },
+  adminGas: () => { throw new MockError("forbidden", "Relayer funding requires the real API.", 403); },
+  adminGasTopup: () => { throw new MockError("forbidden", "Relayer funding requires the real API.", 403); },
 
   // ---- public: checkout
   publicGetSession: ({ state, params }) => toPublicSession(state, findSession(state, params.id!)),

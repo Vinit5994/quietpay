@@ -89,6 +89,7 @@ export function DevWalletProvider({ children }: { children: React.ReactNode }) {
     logout,
     signTypedData,
     signMessage,
+    sendNative: async () => { throw new Error("Connect MetaMask or a Privy wallet to send WBT."); },
   };
 
   return (

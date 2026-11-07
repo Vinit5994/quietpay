@@ -23,6 +23,8 @@ export interface Wallet {
   signTypedData(payload: TypedDataJson, purpose: string): Promise<Hex>;
   /** personal_sign a plain-text message (wallet sign-in). Same rejection behaviour as signTypedData. */
   signMessage(message: string, purpose: string): Promise<Hex>;
+  /** Send native WBT from the connected wallet; the wallet confirms amount and network fees. */
+  sendNative(to: Address, valueWei: bigint): Promise<Hex>;
 }
 
 export class SignatureRejectedError extends Error {

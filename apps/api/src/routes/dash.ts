@@ -8,7 +8,7 @@ import { ApiError } from "../lib/errors";
 import { readBody, send } from "../lib/validate";
 import type { Relayer } from "../relayer";
 import { refundTypedData, submitRefund } from "../services/refunds";
-import { gasTopup, onboardMerchant, overview, rotateKey, toMerchant } from "../services/dash";
+import { gasSummary, gasTopup, onboardMerchant, overview, rotateKey, toMerchant } from "../services/dash";
 import { listPayments } from "../services/payments";
 import { listSubscriptions, toSubscription } from "../services/subscriptions";
 import { toWebhookDelivery } from "../webhooks";
@@ -64,6 +64,7 @@ export function dashRoutes(deps: Deps, relayer: Relayer) {
     const { txHash } = await readBody(c, "dashGasTopup");
     return send(c, "dashGasTopup", await gasTopup(deps, c.get("merchant"), txHash as Hex));
   });
+  app.get("/gas", (c) => send(c, "dashGas", { relayerAddress: deps.chain.relayerAddress, gas: gasSummary(deps, c.get("merchant")) }));
 
   app.post("/refunds/:id/typed-data", async (c) =>
     send(c, "dashRefundTypedData", await refundTypedData(deps, c.get("merchant"), c.req.param("id"))),

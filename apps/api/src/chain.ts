@@ -62,6 +62,7 @@ export type TxReceipt = {
 export interface Chain {
   quietPay: Address;
   relayerAddress: Address;
+  contractOwner(): Promise<Address>;
   usdtBalance(owner: Address): Promise<bigint>;
   /** EOA and smart-wallet (ERC-1271/6492) signatures. */
   verifyMessage(args: { address: Address; message: string; signature: Hex }): Promise<boolean>;
@@ -88,7 +89,7 @@ export interface Chain {
   /** Dry-runs a QuietPay call from the relayer. Throws the viem revert error (decoded by relayer/errors.ts). */
   simulate(fn: RelayFunction, args: readonly unknown[]): Promise<void>;
   /** Signs and broadcasts a QuietPay call from the relayer (nonce-managed). Returns the tx hash. */
-  send(fn: RelayFunction, args: readonly unknown[]): Promise<Hex>;
+  send(fn: RelayFunction, args: readonly unknown[], fees?: { gas: bigint; gasPrice: bigint }): Promise<Hex>;
   waitForReceipt(hash: Hex): Promise<TxReceipt>;
 
   blockNumber(): Promise<bigint>;
@@ -107,6 +108,7 @@ export function createChain(env: Env): Chain {
   const chain: Chain = {
     quietPay,
     relayerAddress: relayer.address,
+    contractOwner: () => publicClient.readContract({ address: quietPay, abi: quietPayAbi, functionName: "owner" }),
 
     usdtBalance: (owner) =>
       publicClient.readContract({ address: USDT_ADDRESS, abi: usdtAbi, functionName: "balanceOf", args: [owner] }),
@@ -181,8 +183,8 @@ export function createChain(env: Env): Chain {
       });
     },
 
-    send: (fn, args) =>
-      wallet.writeContract({ address: quietPay, abi: quietPayAbi, functionName: fn, args: args as never } as never),
+    send: (fn, args, fees) =>
+      wallet.writeContract({ address: quietPay, abi: quietPayAbi, functionName: fn, args: args as never, ...fees } as never),
 
     async waitForReceipt(hash) {
       const r = await publicClient.waitForTransactionReceipt({ hash });

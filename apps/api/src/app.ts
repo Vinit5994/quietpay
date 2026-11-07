@@ -9,6 +9,7 @@ import { Dispatcher } from "./webhooks";
 import { v1Routes } from "./routes/v1";
 import { dashRoutes } from "./routes/dash";
 import { systemRoutes } from "./routes/system";
+import { adminRoutes } from "./routes/admin";
 
 export type Services = { relayer: Relayer; dispatcher: Dispatcher };
 
@@ -35,6 +36,7 @@ export function createApp(deps: Deps, services: Services = createServices(deps))
   app.route("/v1", v1Routes(deps, relayer, dispatcher));
   app.route("/public", publicRoutes(deps, relayer));
   app.route("/dash", dashRoutes(deps, relayer));
+  app.route("/admin", adminRoutes(deps));
   app.route("/", systemRoutes(deps));
 
   app.notFound((c) => c.json({ error: { code: "not_found", message: `No route ${c.req.method} ${c.req.path}.` } }, 404));

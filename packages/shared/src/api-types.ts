@@ -579,6 +579,15 @@ export const RotateKeyResponse = z.object({
 export const GasTopupRequest = z.object({ txHash: TxHash });
 export const GasTopupResponse = GasSummary;
 
+export const GasFundingResponse = z.object({ relayerAddress: Address, gas: GasSummary });
+export const AdminGasResponse = z.object({
+  relayerAddress: Address,
+  balanceWei: UintString,
+  balance: z.string(),
+  merchants: z.array(z.object({ merchant: Merchant, gas: GasSummary })),
+});
+export const AdminGasTopupRequest = GasTopupRequest.extend({ merchantId: MerchantId });
+
 export const RefundTypedDataResponse = z.object({
   refund: Refund,
   /** the merchant payout wallet that must sign */
@@ -871,6 +880,9 @@ export const Endpoints = {
   }),
   dashRotateKey: ep({ method: "POST", path: "/dash/keys/rotate", auth: "merchant", response: RotateKeyResponse }),
   dashGasTopup: ep({ method: "POST", path: "/dash/gas/topup", auth: "merchant", body: GasTopupRequest, response: GasTopupResponse }),
+  dashGas: ep({ method: "GET", path: "/dash/gas", auth: "merchant", response: GasFundingResponse }),
+  adminGas: ep({ method: "GET", path: "/admin/gas", auth: "merchant", response: AdminGasResponse }),
+  adminGasTopup: ep({ method: "POST", path: "/admin/gas/topup", auth: "merchant", body: AdminGasTopupRequest, response: GasTopupResponse }),
 
   // ---- public
   publicGetSession: ep({ method: "GET", path: "/public/sessions/:id", auth: "none", params: IdParams, response: PublicSession }),
